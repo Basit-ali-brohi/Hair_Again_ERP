@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets.dart';
+import '../../../core/router.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -88,11 +89,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _StatRow(p: p, label: 'Next Appointment',   value: '18 Jul 2026'),
             _StatRow(p: p, label: 'Member Since',       value: 'March 2024'),
           ]),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
+
+          // ── My Account ──────────────────────────────────────────────────
+          SectionHeader(title: 'My Account'),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border),
+              boxShadow: [if (!p.isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))]),
+            child: Column(children: [
+              _NavTile(p: p, icon: Icons.card_membership_outlined, color: kGold,               label: 'Membership Plan',    sub: 'Gold Member · active',             onTap: () => context.push('/membership')),
+              _NavTile(p: p, icon: Icons.stars_outlined,           color: const Color(0xFFFFB74D), label: 'Loyalty Points',     sub: '1,250 pts available',              onTap: () => context.push('/loyalty')),
+              _NavTile(p: p, icon: Icons.credit_card_outlined,     color: const Color(0xFF5B8DEF), label: 'Payment History',    sub: 'View invoices & receipts',         onTap: () => context.push('/payments')),
+              _NavTile(p: p, icon: Icons.rate_review_outlined,     color: const Color(0xFF3FA787), label: 'My Reviews',         sub: 'Rate your experience',             onTap: () => context.push('/reviews'), last: true),
+            ]),
+          ),
+          const SizedBox(height: 16),
+
+          // ── My Treatment ─────────────────────────────────────────────────
+          SectionHeader(title: 'My Treatment'),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border),
+              boxShadow: [if (!p.isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))]),
+            child: Column(children: [
+              _NavTile(p: p, icon: Icons.timeline_outlined,        color: kGold,               label: 'Treatment History',  sub: 'Progress & session records',       onTap: () => context.push('/treatments')),
+              _NavTile(p: p, icon: Icons.photo_library_outlined,   color: const Color(0xFF9C6FDE), label: 'Before/After Gallery', sub: 'See your transformation',      onTap: () => context.push('/gallery')),
+              _NavTile(p: p, icon: Icons.chat_bubble_outline,      color: const Color(0xFF3FA787), label: 'Chat Support',       sub: 'Talk to our team',                 onTap: () => context.push('/chat'), last: true),
+            ]),
+          ),
+          const SizedBox(height: 24),
 
           _ActionTile(p: p, icon: Icons.settings_outlined, label: 'Settings', onTap: () => context.push('/settings')),
           const SizedBox(height: 8),
           OutlineBtn(label: 'Change Password', onTap: () => _changePasswordDialog(context, p)),
+          const SizedBox(height: 10),
+          OutlineBtn(
+            label: 'Sign Out',
+            color: kDanger,
+            onTap: () {
+              markLoggedOut();
+              context.go('/login');
+            },
+          ),
           const SizedBox(height: 10),
           OutlineBtn(label: 'Delete Account', onTap: () {}, color: kDanger),
         ]),
@@ -179,6 +218,37 @@ class _StatRow extends StatelessWidget {
       Expanded(child: Text(label, style: p.body(13, color: p.textMuted))),
       Text(value, style: p.body(13, weight: FontWeight.w600)),
     ]),
+  );
+}
+
+class _NavTile extends StatelessWidget {
+  final AppPalette p;
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String sub;
+  final VoidCallback onTap;
+  final bool last;
+  const _NavTile({required this.p, required this.icon, required this.color, required this.label, required this.sub, required this.onTap, this.last = false});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(border: last ? null : Border(bottom: BorderSide(color: p.border, width: 0.5))),
+      child: Row(children: [
+        Container(width: 40, height: 40, decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, size: 20, color: color)),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: p.body(14, weight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(sub, style: p.body(12, color: p.textMuted)),
+        ])),
+        Icon(Icons.chevron_right, size: 18, color: p.textMuted),
+      ]),
+    ),
   );
 }
 
