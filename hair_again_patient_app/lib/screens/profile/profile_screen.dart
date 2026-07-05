@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets.dart';
 import '../../../core/router.dart';
+import '../../../core/profile_notifier.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,8 +14,48 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _editing = false;
+  bool _avatarLoading = false;
 
   final _nameCtrl    = TextEditingController(text: 'Ahmed Khan');
+
+  Future<void> _pickImage(ImageSource source) async {
+    Navigator.pop(context);
+    setState(() => _avatarLoading = true);
+    try {
+      final file = await ImagePicker().pickImage(source: source, imageQuality: 80, maxWidth: 512, maxHeight: 512);
+      if (file != null) {
+        final bytes = await file.readAsBytes();
+        profileNotifier.setAvatar(bytes);
+      }
+    } finally {
+      if (mounted) setState(() => _avatarLoading = false);
+    }
+  }
+
+  void _showAvatarOptions() => showModalBottomSheet(
+    context: context,
+    backgroundColor: HaTheme.of(context).surface,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) {
+      final p = HaTheme.of(context);
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 4, decoration: BoxDecoration(color: p.border, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 18),
+          Text('Change Profile Photo', style: p.display(18)),
+          const SizedBox(height: 20),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+            _AvatarOption(icon: Icons.photo_library_outlined, label: 'Gallery', color: kGold,  onTap: () => _pickImage(ImageSource.gallery)),
+            _AvatarOption(icon: Icons.camera_alt_outlined,   label: 'Camera',  color: kInfo,  onTap: () => _pickImage(ImageSource.camera)),
+            if (profileNotifier.avatarBytes != null)
+              _AvatarOption(icon: Icons.delete_outline_rounded, label: 'Remove', color: kDanger,
+                onTap: () { Navigator.pop(ctx); profileNotifier.setAvatar(null); }),
+          ]),
+        ]),
+      );
+    },
+  );
   final _emailCtrl   = TextEditingController(text: 'ahmed.khan@email.com');
   final _phoneCtrl   = TextEditingController(text: '+92 312 345 6789');
   final _dobCtrl     = TextEditingController(text: '15 March 1988');
@@ -42,7 +84,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              if (_editing) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Profile updated.'), backgroundColor: kSuccess, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+              if (_editing) {
+                profileNotifier.setName(_nameCtrl.text);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Profile updated.'), backgroundColor: kSuccess, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+              }
               setState(() => _editing = !_editing);
             },
             child: Text(_editing ? 'Save' : 'Edit', style: p.body(14, color: kGold, weight: FontWeight.w700)),
@@ -54,15 +99,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
         child: Column(children: [
           // Avatar
-          Center(child: Stack(children: [
-            Container(width: 96, height: 96, decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle),
-              child: Center(child: Text('AK', style: p.display(34, color: Colors.black87)))),
-            if (_editing) Positioned(bottom: 0, right: 0, child: Container(width: 28, height: 28,
-              decoration: BoxDecoration(color: kGold, shape: BoxShape.circle, border: Border.all(color: p.bg, width: 2)),
-              child: const Icon(Icons.camera_alt_outlined, size: 14, color: Colors.black87))),
-          ])),
+          Center(child: GestureDetector(
+            onTap: _showAvatarOptions,
+            child: Stack(children: [
+              ListenableBuilder(
+                listenable: profileNotifier,
+                builder: (_, __) {
+                  final bytes = profileNotifier.avatarBytes;
+                  if (bytes != null) {
+                    return Container(
+                      width: 96, height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: kGold, width: 2.5),
+                        boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.25), blurRadius: 12)],
+                        image: DecorationImage(image: MemoryImage(bytes), fit: BoxFit.cover),
+                      ),
+                    );
+                  }
+                  return Container(
+                    width: 96, height: 96,
+                    decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle),
+                    child: Center(child: _avatarLoading
+                      ? const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(color: Colors.black87, strokeWidth: 2.5))
+                      : Text(profileNotifier.initials, style: p.display(34, color: Colors.black87))),
+                  );
+                },
+              ),
+              // Camera badge — always visible as hint
+              Positioned(bottom: 0, right: 0, child: Container(
+                width: 30, height: 30,
+                decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle, border: Border.all(color: p.bg, width: 2),
+                  boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.3), blurRadius: 6)]),
+                child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.black87),
+              )),
+            ]),
+          )),
           const SizedBox(height: 14),
-          Text('Ahmed Khan', style: p.display(22)),
+          ListenableBuilder(
+            listenable: profileNotifier,
+            builder: (_, __) => Text(profileNotifier.name, style: p.display(22)),
+          ),
           const SizedBox(height: 4),
           Text('Patient ID: #HA-2024-0042', style: p.body(13, color: p.textMuted)),
           const SizedBox(height: 8),
@@ -274,6 +351,32 @@ class _ActionTile extends StatelessWidget {
       ]),
     ),
   );
+}
+
+class _AvatarOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _AvatarOption({required this.icon, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(children: [
+        Container(
+          width: 58, height: 58,
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.10), shape: BoxShape.circle,
+            border: Border.all(color: color.withValues(alpha: 0.25))),
+          child: Icon(icon, color: color, size: 26),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: p.body(13, weight: FontWeight.w600)),
+      ]),
+    );
+  }
 }
 
 class _DialogField extends StatelessWidget {

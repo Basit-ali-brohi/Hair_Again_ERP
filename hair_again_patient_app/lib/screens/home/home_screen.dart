@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets.dart';
+import '../../../core/profile_notifier.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 //  HomeScreen
@@ -34,10 +35,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     Future.delayed(const Duration(milliseconds: 1600), () {
       if (mounted) setState(() => _loading = false);
     });
+    profileNotifier.addListener(_onProfileChange);
   }
+
+  void _onProfileChange() { if (mounted) setState(() {}); }
 
   @override
   void dispose() {
+    profileNotifier.removeListener(_onProfileChange);
     _gradCtrl.dispose();
     super.dispose();
   }
@@ -47,8 +52,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final p = HaTheme.of(context);
     final topPad = MediaQuery.of(context).padding.top;
 
-    // Static hero content — built once, reused every frame by AnimatedBuilder
-    final heroContent = _HeroContent(p: p, topPad: topPad, quickActions: _quickActions);
+    final heroContent = _HeroContent(
+      p: p, topPad: topPad, quickActions: _quickActions,
+      profileName: profileNotifier.name,
+      profileInitials: profileNotifier.initials,
+      avatarBytes: profileNotifier.avatarBytes,
+    );
 
     return Scaffold(
       backgroundColor: p.bg,
@@ -147,7 +156,11 @@ class _HeroContent extends StatelessWidget {
   final AppPalette p;
   final double topPad;
   final List<(IconData, String, String)> quickActions;
-  const _HeroContent({required this.p, required this.topPad, required this.quickActions});
+  final String profileName;
+  final String profileInitials;
+  final dynamic avatarBytes; // Uint8List?
+  const _HeroContent({required this.p, required this.topPad, required this.quickActions,
+    required this.profileName, required this.profileInitials, required this.avatarBytes});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -159,7 +172,7 @@ class _HeroContent extends StatelessWidget {
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Good Morning,', style: p.body(13, color: p.textMuted))
               .animate().fadeIn(duration: 400.ms).slideX(begin: -0.04, end: 0),
-          Text('Ahmad Ali', style: p.display(26))
+          Text(profileName, style: p.display(26))
               .animate().fadeIn(delay: 80.ms, duration: 400.ms).slideX(begin: -0.04, end: 0),
         ]),
         const Spacer(),
@@ -184,12 +197,22 @@ class _HeroContent extends StatelessWidget {
         const SizedBox(width: 10),
         PressableCard(
           onTap: () => context.go('/profile-tab'),
-          child: Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 3))]),
-            child: Center(child: Text('AA', style: p.body(14, color: Colors.black87, weight: FontWeight.w800))),
-          ),
+          child: avatarBytes != null
+            ? Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: kGold, width: 2),
+                  boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 3))],
+                  image: DecorationImage(image: MemoryImage(avatarBytes), fit: BoxFit.cover),
+                ),
+              )
+            : Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 3))]),
+                child: Center(child: Text(profileInitials, style: p.body(14, color: Colors.black87, weight: FontWeight.w800))),
+              ),
         ).animate().fadeIn(delay: 160.ms, duration: 350.ms),
       ]),
       const SizedBox(height: 22),

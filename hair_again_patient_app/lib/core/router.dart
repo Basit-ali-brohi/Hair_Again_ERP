@@ -6,6 +6,8 @@ import '../screens/onboarding_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/auth/otp_screen.dart';
+import '../screens/auth/forgot_password_screen.dart';
+import '../screens/auth/reset_password_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/services/services_screen.dart';
 import '../screens/appointments/history_screen.dart';
@@ -70,7 +72,7 @@ final appRouter = GoRouter(
   redirect: (context, state) {
     final path = state.matchedLocation;
     if (path == '/splash' || path == '/onboarding') return null;
-    final authPaths = {'/login', '/register', '/otp'};
+    final authPaths = {'/login', '/register', '/otp', '/forgot-password', '/reset-password'};
     if (!_isLoggedIn && !authPaths.contains(path)) return '/login';
     return null;
   },
@@ -81,7 +83,15 @@ final appRouter = GoRouter(
     // Auth — fade transition
     GoRoute(path: '/login',    pageBuilder: (_, __) => _fadePage(const LoginScreen())),
     GoRoute(path: '/register', pageBuilder: (_, __) => _fadePage(const RegisterScreen())),
-    GoRoute(path: '/otp',      pageBuilder: (c, s)  => _fadePage(OtpScreen(email: s.extra as String? ?? ''))),
+    GoRoute(path: '/otp', pageBuilder: (c, s) {
+      final extra = s.extra;
+      if (extra is Map<String, String>) {
+        return _fadePage(OtpScreen(email: extra['email'] ?? '', mode: extra['mode'] ?? 'register'));
+      }
+      return _fadePage(OtpScreen(email: extra as String? ?? ''));
+    }),
+    GoRoute(path: '/forgot-password', pageBuilder: (_, __) => _fadePage(const ForgotPasswordScreen())),
+    GoRoute(path: '/reset-password',  pageBuilder: (_, __) => _slideUpPage(const ResetPasswordScreen())),
 
     // Booking & history — slide up (modal feel)
     GoRoute(path: '/book',         pageBuilder: (_, __) => _slideUpPage(const BookAppointmentScreen())),

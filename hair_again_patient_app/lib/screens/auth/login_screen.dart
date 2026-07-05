@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // Forgot password
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton(onPressed: () {}, child: Text('Forgot Password?', style: kBody(13, color: kGold, weight: FontWeight.w600))),
+              child: TextButton(onPressed: () => context.push('/forgot-password'), child: Text('Forgot Password?', style: kBody(13, color: kGold, weight: FontWeight.w600))),
             ),
             const SizedBox(height: 8),
 

@@ -6,7 +6,8 @@ import '../../../core/router.dart';
 
 class OtpScreen extends StatefulWidget {
   final String email;
-  const OtpScreen({super.key, required this.email});
+  final String mode; // 'register' | 'reset'
+  const OtpScreen({super.key, required this.email, this.mode = 'register'});
   @override
   State<OtpScreen> createState() => _OtpScreenState();
 }
@@ -38,8 +39,12 @@ class _OtpScreenState extends State<OtpScreen> {
     setState(() { _loading = true; _error = null; });
     await Future.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
-    markLoggedIn();
-    context.go('/home');
+    if (widget.mode == 'reset') {
+      context.pushReplacement('/reset-password');
+    } else {
+      markLoggedIn();
+      context.go('/home');
+    }
   }
 
   @override
