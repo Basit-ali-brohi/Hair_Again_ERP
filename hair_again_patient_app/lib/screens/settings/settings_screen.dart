@@ -59,15 +59,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _SectionLabel('Security', p),
         _ToggleTile(p: p, icon: Icons.fingerprint_outlined, title: 'Biometric Login', subtitle: 'Use fingerprint or Face ID', value: _biometric, onChanged: (v) => setState(() => _biometric = v)),
         _NavTile(p: p, icon: Icons.lock_outline, title: 'Change Password', subtitle: 'Update your login password', onTap: () => _changePasswordSheet(context, p)),
-        _NavTile(p: p, icon: Icons.devices_outlined, title: 'Active Sessions', subtitle: 'Manage logged-in devices', onTap: () {}),
+        _NavTile(p: p, icon: Icons.devices_outlined, title: 'Active Sessions', subtitle: 'Manage logged-in devices', onTap: () => context.push('/sessions')),
 
         const SizedBox(height: 4),
         _SectionLabel('Account', p),
-        _NavTile(p: p, icon: Icons.language_outlined, title: 'Language', subtitle: 'English', onTap: () {}),
+        _NavTile(p: p, icon: Icons.language_outlined, title: 'Language', subtitle: 'English', onTap: () => context.push('/language')),
         _NavTile(p: p, icon: Icons.info_outline, title: 'About Hair Again', subtitle: 'Version 1.0.0', onTap: () => _showAbout(context, p)),
-        _NavTile(p: p, icon: Icons.description_outlined, title: 'Terms & Conditions', subtitle: 'Read our terms', onTap: () {}),
-        _NavTile(p: p, icon: Icons.privacy_tip_outlined, title: 'Privacy Policy', subtitle: 'How we use your data', onTap: () {}),
-        _NavTile(p: p, icon: Icons.help_outline, title: 'Help & Support', subtitle: 'FAQs and contact support', onTap: () => context.push('/chat')),
+        _NavTile(p: p, icon: Icons.description_outlined, title: 'Terms & Conditions', subtitle: 'Read our terms', onTap: () => context.push('/terms')),
+        _NavTile(p: p, icon: Icons.privacy_tip_outlined, title: 'Privacy Policy', subtitle: 'How we use your data', onTap: () => context.push('/privacy')),
+        _NavTile(p: p, icon: Icons.help_outline, title: 'Help & Support', subtitle: 'FAQs and contact support', onTap: () => context.push('/help')),
 
         const SizedBox(height: 20),
         Padding(

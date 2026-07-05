@@ -32,86 +32,89 @@ class _GalleryScreenState extends State<GalleryScreen> {
     return Scaffold(
       backgroundColor: p.bg,
       appBar: const KAppBar(title: 'Before & After Gallery'),
-      body: Column(children: [
-        // ── Featured interactive slider ──────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(6)),
-                child: const Text('FEATURED CASE', style: TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
-              ),
-              const SizedBox(width: 10),
-              Text('Drag to compare', style: p.body(12, color: p.textMuted)),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: kSuccess.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
-                child: Text('14 months', style: p.body(11, color: kSuccess, weight: FontWeight.w700)),
-              ),
-            ]),
-            const SizedBox(height: 10),
-            BeforeAfterSlider(
-              height: 280,
-              initialSplit: 0.40,
-              before: _BeforePanel(p: p),
-              after:  _AfterPanel(p: p),
-            ),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: _StatPill(icon: Icons.content_cut_rounded, label: '3,500 Grafts', p: p)),
-              const SizedBox(width: 8),
-              Expanded(child: _StatPill(icon: Icons.person_rounded, label: 'Male, 29', p: p)),
-              const SizedBox(width: 8),
-              Expanded(child: _StatPill(icon: Icons.medical_services_rounded, label: 'FUE Technique', p: p)),
-            ]),
-          ]),
-        ),
-
-        // ── Filter chips ─────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: SizedBox(height: 36, child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: _filters.map((f) {
-              final sel = f == _filter;
-              return GestureDetector(
-                onTap: () => setState(() => _filter = f),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: sel ? kGold : p.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: sel ? kGold : p.border),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(f, style: p.body(13,
-                    color: sel ? Colors.black87 : p.textMuted,
-                    weight: sel ? FontWeight.w600 : FontWeight.w400)),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // ── Featured interactive slider ────────────────────────────────────
+          SliverToBoxAdapter(child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(6)),
+                  child: const Text('FEATURED CASE', style: TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
                 ),
-              );
-            }).toList(),
+                const SizedBox(width: 10),
+                Text('Drag to compare', style: p.body(12, color: p.textMuted)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: kSuccess.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                  child: Text('14 months', style: p.body(11, color: kSuccess, weight: FontWeight.w700)),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              BeforeAfterSlider(height: 260, initialSplit: 0.40, before: _BeforePanel(p: p), after: _AfterPanel(p: p)),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(child: _StatPill(icon: Icons.content_cut_rounded, label: '3,500 Grafts', p: p)),
+                const SizedBox(width: 8),
+                Expanded(child: _StatPill(icon: Icons.person_rounded, label: 'Male, 29', p: p)),
+                const SizedBox(width: 8),
+                Expanded(child: _StatPill(icon: Icons.medical_services_rounded, label: 'FUE Technique', p: p)),
+              ]),
+            ]),
           )),
-        ),
-        Container(height: 1, color: p.border),
 
-        // ── Grid ─────────────────────────────────────────────────────────────
-        Expanded(child: list.isEmpty
-          ? const EmptyState(icon: Icons.photo_library_outlined, title: 'No Results', subtitle: 'Try a different filter.')
-          : GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.75),
-              itemCount: list.length,
-              itemBuilder: (_, i) => _GalleryCard(case_: list[i]),
+          // ── Filter chips ──────────────────────────────────────────────────
+          SliverToBoxAdapter(child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: SizedBox(height: 36, child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: _filters.map((f) {
+                final sel = f == _filter;
+                return GestureDetector(
+                  onTap: () => setState(() => _filter = f),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: sel ? kGold : p.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: sel ? kGold : p.border),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(f, style: p.body(13,
+                      color: sel ? Colors.black87 : p.textMuted,
+                      weight: sel ? FontWeight.w600 : FontWeight.w400)),
+                  ),
+                );
+              }).toList(),
+            )),
+          )),
+          SliverToBoxAdapter(child: Container(height: 1, color: p.border)),
+
+          // ── Grid or empty state ───────────────────────────────────────────
+          if (list.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: EmptyState(icon: Icons.photo_library_outlined, title: 'No Results', subtitle: 'Try a different filter.'),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+              sliver: SliverGrid.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.75),
+                itemCount: list.length,
+                itemBuilder: (_, i) => _GalleryCard(case_: list[i]),
+              ),
             ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }

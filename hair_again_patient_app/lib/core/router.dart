@@ -20,6 +20,11 @@ import '../screens/payments/payments_screen.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/reviews/reviews_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/settings/sessions_screen.dart';
+import '../screens/settings/language_screen.dart';
+import '../screens/settings/terms_screen.dart';
+import '../screens/settings/privacy_screen.dart';
+import '../screens/settings/help_screen.dart';
 import 'theme.dart';
 
 bool _isLoggedIn = false;
@@ -90,6 +95,11 @@ final appRouter = GoRouter(
     GoRoute(path: '/payments',   pageBuilder: (_, __) => _fadePage(const PaymentsScreen())),
     GoRoute(path: '/reviews',    pageBuilder: (_, __) => _fadePage(const ReviewsScreen())),
     GoRoute(path: '/settings',   pageBuilder: (_, __) => _fadePage(const SettingsScreen())),
+    GoRoute(path: '/sessions',   pageBuilder: (_, __) => _fadePage(const SessionsScreen())),
+    GoRoute(path: '/language',   pageBuilder: (_, __) => _fadePage(const LanguageScreen())),
+    GoRoute(path: '/terms',      pageBuilder: (_, __) => _fadePage(const TermsScreen())),
+    GoRoute(path: '/privacy',    pageBuilder: (_, __) => _fadePage(const PrivacyScreen())),
+    GoRoute(path: '/help',       pageBuilder: (_, __) => _fadePage(const HelpScreen())),
 
     // Chat — slide up
     GoRoute(path: '/chat', pageBuilder: (_, __) => _slideUpPage(const ChatScreen())),
