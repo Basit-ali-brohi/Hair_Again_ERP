@@ -32,6 +32,16 @@ class AppPalette {
       ? const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0E0E12), Color(0xFF1A1500), Color(0xFF0E0E12)], stops: [0.0, 0.5, 1.0])
       : const LinearGradient(colors: [Color(0xFFFBF9F5), Color(0xFFFBF9F5)]);
 
+  BoxDecoration glassDecoration({double radius = 20}) => BoxDecoration(
+    color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.72),
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.55)),
+    boxShadow: [
+      BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.07), blurRadius: 30, offset: const Offset(0, 10)),
+      if (isDark) BoxShadow(color: kGold.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 2)),
+    ],
+  );
+
   TextStyle display(double size, {Color? color, double spacing = 0}) =>
       GoogleFonts.inter(fontSize: size, fontWeight: FontWeight.w800, color: color ?? text, letterSpacing: spacing, height: 1.1);
 

@@ -1,108 +1,127 @@
+import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets.dart';
 
-class HomeScreen extends StatelessWidget {
+// ──────────────────────────────────────────────────────────────────────────────
+//  HomeScreen
+// ──────────────────────────────────────────────────────────────────────────────
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _gradCtrl;
 
   static const _quickActions = [
-    (Icons.calendar_month_outlined, 'Book', '/book'),
-    (Icons.history_outlined,        'History', '/appointments'),
-    (Icons.auto_awesome_outlined,   'Gallery', '/gallery'),
-    (Icons.chat_bubble_outline,     'Support', '/chat'),
+    (Icons.calendar_month_rounded, 'Book', '/book'),
+    (Icons.history_rounded,        'History', '/appointments'),
+    (Icons.auto_awesome_rounded,   'Gallery', '/gallery'),
+    (Icons.chat_bubble_rounded,    'Support', '/chat'),
   ];
 
-  static const _upcomingAppt = (
-    'Hair Transplant Consultation',
-    'Dr. Bilal Khan',
-    'Mon, 7 Jul 2026 • 11:00 AM',
-    'Confirmed',
-  );
+  @override
+  void initState() {
+    super.initState();
+    _gradCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 6))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _gradCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = HaTheme.of(context);
+    final topPad = MediaQuery.of(context).padding.top;
+
+    // Static hero content — built once, reused every frame by AnimatedBuilder
+    final heroContent = _HeroContent(p: p, topPad: topPad, quickActions: _quickActions);
+
     return Scaffold(
       backgroundColor: p.bg,
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
-          // Hero header
-          SliverToBoxAdapter(child: Container(
-            decoration: BoxDecoration(
-              gradient: p.heroGradient,
-              boxShadow: p.isDark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 12, offset: const Offset(0, 4))],
-            ),
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 18, 20, 24),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Good Morning,', style: p.body(13, color: p.textMuted)),
-                  Text('Ahmad Ali', style: p.display(24)),
-                ]),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () {},
-                  child: Stack(children: [
-                    Container(width: 44, height: 44, decoration: BoxDecoration(color: kGold.withValues(alpha: 0.15), shape: BoxShape.circle), child: const Icon(Icons.notifications_outlined, color: kGold, size: 22)),
-                    Positioned(top: 9, right: 9, child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: kDanger, shape: BoxShape.circle))),
-                  ]),
-                ),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: () => context.go('/profile-tab'),
-                  child: Container(
-                    width: 44, height: 44,
-                    decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle),
-                    child: Center(child: Text('AA', style: p.body(14, color: Colors.black87, weight: FontWeight.w800))),
+          // ── Animated gradient hero ──────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: AnimatedBuilder(
+              animation: _gradCtrl,
+              child: heroContent,            // built once, no rebuild each frame
+              builder: (_, child) {
+                final t = _gradCtrl.value;
+                final shift = math.sin(t * math.pi) * 0.15;
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment(-1.0 + shift, -1.0),
+                      end:   Alignment(1.0 - shift,  1.0),
+                      colors: p.isDark
+                          ? [
+                              const Color(0xFF0E0E12),
+                              Color.lerp(const Color(0xFF1A1200), const Color(0xFF221800), t)!,
+                              const Color(0xFF0E0E12),
+                            ]
+                          : [
+                              const Color(0xFFFBF9F5),
+                              Color.lerp(const Color(0xFFF5EDD8), const Color(0xFFFDF6E8), t)!,
+                              const Color(0xFFFBF9F5),
+                            ],
+                      stops: const [0.0, 0.5, 1.0],
+                    ),
                   ),
-                ),
-              ]),
-              const SizedBox(height: 22),
-              // Stats row — Expanded prevents overflow
-              Row(children: [
-                Expanded(child: _MiniStat('3', 'Appointments', p)),
-                const SizedBox(width: 10),
-                Expanded(child: _MiniStat('1,250', 'Loyalty Pts', p)),
-                const SizedBox(width: 10),
-                Expanded(child: _MiniStat('Gold', 'Membership', p)),
-              ]),
-            ]),
-          )),
+                  child: child!,
+                );
+              },
+            ),
+          ),
 
+          // ── Scrollable content ──────────────────────────────────────────────
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 110),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
             sliver: SliverList(delegate: SliverChildListDelegate([
 
               // Upcoming appointment
               SectionHeader(title: 'Upcoming Appointment'),
               const SizedBox(height: 14),
-              _UpcomingCard(appt: _upcomingAppt, p: p),
-              const SizedBox(height: 28),
-
-              // Quick actions
-              SectionHeader(title: 'Quick Actions'),
-              const SizedBox(height: 14),
-              Row(children: _quickActions.map((a) => Expanded(child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _QuickAction(icon: a.$1, label: a.$2, route: a.$3, p: p),
-              ))).toList()),
+              PressableCard(onTap: () => context.push('/appointments'), child: _UpcomingCard(p: p))
+                .animate().fadeIn(delay: 80.ms, duration: 350.ms).slideY(begin: 0.05, end: 0),
               const SizedBox(height: 28),
 
               // Promo banner
               SectionHeader(title: 'Offers & Promotions'),
               const SizedBox(height: 14),
-              _PromoBanner(p: p),
+              PressableCard(onTap: () => context.push('/book'), child: _PromoBanner(p: p))
+                .animate().fadeIn(delay: 160.ms, duration: 350.ms).slideY(begin: 0.05, end: 0),
               const SizedBox(height: 28),
 
               // Popular services
-              SectionHeader(title: 'Popular Services', action: 'See All', onAction: () => context.go('/services')),
+              SectionHeader(
+                title: 'Popular Services',
+                action: 'See All',
+                onAction: () => context.go('/services'),
+              ),
               const SizedBox(height: 14),
+
               ...[
-                (Icons.content_cut_outlined, 'Hair Transplant',  'FUE / FUT Technique',    'From Rs 80,000'),
-                (Icons.water_drop_outlined,  'PRP Therapy',      'Platelet Rich Plasma',    'From Rs 12,000'),
-                (Icons.spa_outlined,         'Scalp Treatment',  'Deep cleanse & nourish',  'From Rs 4,500'),
-              ].map((s) => _ServiceTile(icon: s.$1, name: s.$2, subtitle: s.$3, price: s.$4, p: p)),
+                (Icons.content_cut_rounded,  'Hair Transplant',  'FUE / FUT Technique',   'From Rs 80,000', const Color(0xFFE8A94A)),
+                (Icons.water_drop_rounded,   'PRP Therapy',      'Platelet Rich Plasma',   'From Rs 12,000', const Color(0xFF5B8DEF)),
+                (Icons.spa_rounded,          'Scalp Treatment',  'Deep cleanse & nourish', 'From Rs 4,500',  const Color(0xFF3FA787)),
+              ].indexed.map((e) {
+                final (idx, s) = e;
+                return PressableCard(
+                  onTap: () => context.push('/book'),
+                  child: _ServiceTile(icon: s.$1, name: s.$2, subtitle: s.$3, price: s.$4, accent: s.$5, p: p),
+                ).animate().fadeIn(delay: (200 + idx * 80).ms, duration: 350.ms).slideY(begin: 0.06, end: 0);
+              }),
             ])),
           ),
         ],
@@ -111,33 +130,122 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _MiniStat extends StatelessWidget {
-  final String value, label;
+// ──────────────────────────────────────────────────────────────────────────────
+//  Hero content — static, passed as AnimatedBuilder.child so it builds once
+// ──────────────────────────────────────────────────────────────────────────────
+class _HeroContent extends StatelessWidget {
   final AppPalette p;
-  const _MiniStat(this.value, this.label, this.p);
+  final double topPad;
+  final List<(IconData, String, String)> quickActions;
+  const _HeroContent({required this.p, required this.topPad, required this.quickActions});
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    decoration: BoxDecoration(
-      color: p.isDark
-          ? Colors.black.withValues(alpha: 0.18)
-          : kGold.withValues(alpha: 0.10),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: p.isDark
-            ? Colors.white.withValues(alpha: 0.08)
-            : kGold.withValues(alpha: 0.30),
-      ),
-    ),
-    child: Column(children: [
-      Text(value, style: p.body(16, color: kGold, weight: FontWeight.w800)),
-      const SizedBox(height: 3),
-      Text(label, style: p.body(11, color: p.isDark ? Colors.white70 : p.textMuted), textAlign: TextAlign.center),
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(20, topPad + 18, 20, 28),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+      // Top row — greeting + avatar
+      Row(children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Good Morning,', style: p.body(13, color: p.textMuted))
+              .animate().fadeIn(duration: 400.ms).slideX(begin: -0.04, end: 0),
+          Text('Ahmad Ali', style: p.display(26))
+              .animate().fadeIn(delay: 80.ms, duration: 400.ms).slideX(begin: -0.04, end: 0),
+        ]),
+        const Spacer(),
+        PressableCard(
+          onTap: () => context.go('/notif-tab'),
+          child: Stack(children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: kGold.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+                border: Border.all(color: kGold.withValues(alpha: 0.25)),
+              ),
+              child: const Icon(Icons.notifications_rounded, color: kGold, size: 22),
+            ),
+            Positioned(top: 9, right: 9, child: Container(
+              width: 8, height: 8,
+              decoration: const BoxDecoration(color: kDanger, shape: BoxShape.circle),
+            )),
+          ]),
+        ).animate().fadeIn(delay: 120.ms, duration: 350.ms),
+        const SizedBox(width: 10),
+        PressableCard(
+          onTap: () => context.go('/profile-tab'),
+          child: Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(gradient: kGoldGradient, shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 3))]),
+            child: Center(child: Text('AA', style: p.body(14, color: Colors.black87, weight: FontWeight.w800))),
+          ),
+        ).animate().fadeIn(delay: 160.ms, duration: 350.ms),
+      ]),
+      const SizedBox(height: 22),
+
+      // Glass stat row
+      Row(children: [
+        Expanded(child: _GlassStat(label: 'Appointments', value: 3, formatter: (v) => '$v', p: p)),
+        const SizedBox(width: 10),
+        Expanded(child: _GlassStat(label: 'Loyalty Pts', value: 1250, formatter: (v) => v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : '$v', p: p)),
+        const SizedBox(width: 10),
+        Expanded(child: _GlassStat(label: 'Membership', value: 0, formatter: (_) => 'Gold', p: p)),
+      ]).animate().fadeIn(delay: 200.ms, duration: 400.ms).slideY(begin: 0.05, end: 0),
+      const SizedBox(height: 22),
+
+      // Quick-action row
+      Row(children: quickActions.map((a) => Expanded(child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: _QuickAction(icon: a.$1, label: a.$2, route: a.$3, p: p),
+      ))).toList()).animate().fadeIn(delay: 280.ms, duration: 380.ms).slideY(begin: 0.05, end: 0),
     ]),
   );
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+//  Glass stat pill with animated counter
+// ──────────────────────────────────────────────────────────────────────────────
+class _GlassStat extends StatelessWidget {
+  final String label;
+  final int value;
+  final String Function(int) formatter;
+  final AppPalette p;
+  const _GlassStat({required this.label, required this.value, required this.formatter, required this.p});
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(14),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: p.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: p.isDark ? Colors.white.withValues(alpha: 0.10) : kGold.withValues(alpha: 0.20)),
+          boxShadow: [
+            if (p.isDark) BoxShadow(color: kGold.withValues(alpha: 0.05), blurRadius: 12),
+            if (!p.isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(children: [
+          AnimatedCounter(
+            value: value,
+            style: p.body(17, color: kGold, weight: FontWeight.w800),
+            formatter: formatter,
+          ),
+          const SizedBox(height: 3),
+          Text(label, style: p.body(11, color: p.isDark ? Colors.white60 : p.textMuted), textAlign: TextAlign.center),
+        ]),
+      ),
+    ),
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Quick action button
+// ──────────────────────────────────────────────────────────────────────────────
 class _QuickAction extends StatelessWidget {
   final IconData icon;
   final String label, route;
@@ -145,58 +253,77 @@ class _QuickAction extends StatelessWidget {
   const _QuickAction({required this.icon, required this.label, required this.route, required this.p});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => PressableCard(
     onTap: () => context.push(route),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(
         width: 58, height: 58,
         decoration: BoxDecoration(
-          color: kGold.withValues(alpha: 0.1),
+          gradient: LinearGradient(
+            colors: [kGold.withValues(alpha: 0.18), kGold.withValues(alpha: 0.06)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: kGold.withValues(alpha: 0.25)),
+          border: Border.all(color: kGold.withValues(alpha: 0.30)),
+          boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Icon(icon, color: kGold, size: 24),
       ),
       const SizedBox(height: 8),
-      Text(label, style: p.body(12, weight: FontWeight.w600, color: p.textMuted), textAlign: TextAlign.center),
+      Text(label, style: p.body(12, weight: FontWeight.w600, color: p.isDark ? Colors.white70 : p.textMuted), textAlign: TextAlign.center),
     ]),
   );
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+//  Upcoming appointment card
+// ──────────────────────────────────────────────────────────────────────────────
 class _UpcomingCard extends StatelessWidget {
-  final (String, String, String, String) appt;
   final AppPalette p;
-  const _UpcomingCard({required this.appt, required this.p});
+  const _UpcomingCard({required this.p});
 
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: p.surface,
-      gradient: LinearGradient(colors: [kGold.withValues(alpha: 0.1), p.surface]),
+      gradient: LinearGradient(
+        colors: [kGold.withValues(alpha: p.isDark ? 0.12 : 0.08), p.surface],
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
+      ),
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: kGold.withValues(alpha: 0.25)),
-      boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 4))],
+      border: Border.all(color: kGold.withValues(alpha: 0.28)),
+      boxShadow: [
+        BoxShadow(color: kGold.withValues(alpha: 0.10), blurRadius: 20, offset: const Offset(0, 6)),
+        if (!p.isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+      ],
     ),
     child: Row(children: [
-      Container(width: 50, height: 50, decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.event_outlined, color: Colors.black87, size: 24)),
+      Container(
+        width: 52, height: 52,
+        decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(15),
+          boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 3))]),
+        child: const Icon(Icons.event_rounded, color: Colors.black87, size: 24),
+      ),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(appt.$1, style: p.body(14, weight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text('Hair Transplant Consultation', style: p.body(14, weight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 3),
-        Text(appt.$2, style: p.body(12, color: p.textMuted)),
+        Text('Dr. Bilal Khan', style: p.body(12, color: p.textMuted)),
         const SizedBox(height: 3),
         Row(children: [
-          const Icon(Icons.schedule, size: 12, color: kGold),
+          const Icon(Icons.schedule_rounded, size: 13, color: kGold),
           const SizedBox(width: 4),
-          Flexible(child: Text(appt.$3, style: p.body(12, color: kGold, weight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+          Flexible(child: Text('Mon, 7 Jul 2026 • 11:00 AM', style: p.body(12, color: kGold, weight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
         ]),
       ])),
-      StatusBadge(label: appt.$4, color: kSuccess),
+      const StatusBadge(label: 'Confirmed', color: kSuccess),
     ]),
   );
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+//  Promo banner
+// ──────────────────────────────────────────────────────────────────────────────
 class _PromoBanner extends StatelessWidget {
   final AppPalette p;
   const _PromoBanner({required this.p});
@@ -205,63 +332,99 @@ class _PromoBanner extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      gradient: LinearGradient(colors: [const Color(0xFF1A1500), p.isDark ? const Color(0xFF0E0E12) : const Color(0xFF3D2800)]),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: kGold.withValues(alpha: 0.2)),
+      gradient: LinearGradient(
+        colors: p.isDark
+            ? [const Color(0xFF1A1300), const Color(0xFF0E0A00)]
+            : [const Color(0xFF3D2800), const Color(0xFF1A1000)],
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: kGold.withValues(alpha: 0.25)),
+      boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, 6))],
     ),
     child: Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: kGold, borderRadius: BorderRadius.circular(4)), child: const Text('LIMITED OFFER', style: TextStyle(fontSize: 9, color: Colors.black87, fontWeight: FontWeight.w800, letterSpacing: 0.8))),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(5)),
+          child: const Text('LIMITED OFFER', style: TextStyle(fontSize: 9, color: Colors.black87, fontWeight: FontWeight.w800, letterSpacing: 0.9)),
+        ),
         const SizedBox(height: 10),
-        const Text('20% off PRP\nTherapy this month', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
-        const SizedBox(height: 14),
-        GestureDetector(
-          onTap: () => context.push('/book'),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-            decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(10),
-              boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))]),
-            child: const Text('Book Now', style: TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w700)),
+        const Text('20% off PRP\nTherapy this month', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: kGoldGradient,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))],
           ),
+          child: const Text('Book Now', style: TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w700)),
         ),
       ])),
-      Container(width: 80, height: 80, decoration: BoxDecoration(color: kGold.withValues(alpha: 0.12), shape: BoxShape.circle), child: const Icon(Icons.water_drop_outlined, color: kGold, size: 38)),
+      const SizedBox(width: 12),
+      Container(
+        width: 78, height: 78,
+        decoration: BoxDecoration(
+          color: kGold.withValues(alpha: 0.10),
+          shape: BoxShape.circle,
+          border: Border.all(color: kGold.withValues(alpha: 0.25)),
+          boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.15), blurRadius: 16)],
+        ),
+        child: const Icon(Icons.water_drop_rounded, color: kGold, size: 36),
+      ),
     ]),
   );
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+//  Service tile — gradient icon box
+// ──────────────────────────────────────────────────────────────────────────────
 class _ServiceTile extends StatelessWidget {
   final IconData icon;
   final String name, subtitle, price;
+  final Color accent;
   final AppPalette p;
-  const _ServiceTile({required this.icon, required this.name, required this.subtitle, required this.price, required this.p});
+  const _ServiceTile({required this.icon, required this.name, required this.subtitle, required this.price, required this.accent, required this.p});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: () => context.push('/book'),
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: p.border),
-        boxShadow: [if (!p.isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      child: Row(children: [
-        Container(width: 46, height: 46, decoration: BoxDecoration(color: kGold.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: kGold, size: 22)),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(name, style: p.body(15, weight: FontWeight.w700)),
-          const SizedBox(height: 3),
-          Text(subtitle, style: p.body(12, color: p.textMuted)),
-        ])),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(price, style: p.body(13, color: kGold, weight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Icon(Icons.arrow_forward_ios, size: 12, color: p.textMuted),
-        ]),
-      ]),
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: p.surface,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: p.border),
+      boxShadow: [
+        if (!p.isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3)),
+        BoxShadow(color: accent.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 4)),
+      ],
     ),
+    child: Row(children: [
+      Container(
+        width: 48, height: 48,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [accent.withValues(alpha: 0.18), accent.withValues(alpha: 0.06)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accent.withValues(alpha: 0.20)),
+        ),
+        child: Icon(icon, color: accent, size: 23),
+      ),
+      const SizedBox(width: 14),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(name, style: p.body(15, weight: FontWeight.w700)),
+        const SizedBox(height: 3),
+        Text(subtitle, style: p.body(12, color: p.textMuted)),
+      ])),
+      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text(price, style: p.body(12, color: kGold, weight: FontWeight.w700)),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(color: kGold.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+          child: const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: kGold),
+        ),
+      ]),
+    ]),
   );
 }

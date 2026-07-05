@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'theme.dart';
 
 // ── Gold CTA button ─────────────────────────────────────────────────────────────
@@ -175,4 +176,54 @@ class InfoRow extends StatelessWidget {
       ]),
     );
   }
+}
+
+// ── Pressable card — spring scale on tap ────────────────────────────────────────
+class PressableCard extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressScale;
+  const PressableCard({super.key, required this.child, this.onTap, this.pressScale = 0.97});
+  @override
+  State<PressableCard> createState() => _PressableCardState();
+}
+
+class _PressableCardState extends State<PressableCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () {
+      HapticFeedback.lightImpact();
+      widget.onTap?.call();
+    },
+    onTapDown: (_) => setState(() => _pressed = true),
+    onTapUp: (_) => setState(() => _pressed = false),
+    onTapCancel: () => setState(() => _pressed = false),
+    child: AnimatedScale(
+      scale: _pressed ? widget.pressScale : 1.0,
+      duration: const Duration(milliseconds: 110),
+      curve: Curves.easeOut,
+      child: widget.child,
+    ),
+  );
+}
+
+// ── Animated counter — counts up from 0 on widget mount ────────────────────────
+class AnimatedCounter extends StatelessWidget {
+  final int value;
+  final TextStyle style;
+  final String Function(int)? formatter;
+  const AnimatedCounter({super.key, required this.value, required this.style, this.formatter});
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<int>(
+    tween: IntTween(begin: 0, end: value),
+    duration: const Duration(milliseconds: 1400),
+    curve: Curves.easeOutCubic,
+    builder: (_, v, __) => Text(
+      formatter != null ? formatter!(v) : v.toString(),
+      style: style,
+    ),
+  );
 }

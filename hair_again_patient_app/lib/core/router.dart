@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../screens/splash_screen.dart';
@@ -21,9 +22,43 @@ import '../screens/reviews/reviews_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import 'theme.dart';
 
-// Simple session flag — replace with real auth state (Provider/Riverpod) later
 bool _isLoggedIn = false;
 bool _hasSeenOnboarding = false;
+
+// ── Transition helpers ─────────────────────────────────────────────────────────
+
+/// Subtle fade + micro-slide up — standard push transition.
+Page<void> _fadePage(Widget child) => CustomTransitionPage<void>(
+  child: child,
+  transitionDuration: const Duration(milliseconds: 280),
+  reverseTransitionDuration: const Duration(milliseconds: 220),
+  transitionsBuilder: (_, anim, __, child) => FadeTransition(
+    opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+    child: SlideTransition(
+      position: Tween(begin: const Offset(0, 0.04), end: Offset.zero)
+          .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+      child: child,
+    ),
+  ),
+);
+
+/// Full slide-up from bottom — modal / detail screens.
+Page<void> _slideUpPage(Widget child) => CustomTransitionPage<void>(
+  child: child,
+  transitionDuration: const Duration(milliseconds: 380),
+  reverseTransitionDuration: const Duration(milliseconds: 300),
+  transitionsBuilder: (_, anim, __, child) => SlideTransition(
+    position: Tween(begin: const Offset(0, 1), end: Offset.zero)
+        .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+    child: FadeTransition(
+      opacity: Tween(begin: 0.0, end: 1.0)
+          .animate(CurvedAnimation(parent: anim, curve: const Interval(0, 0.45))),
+      child: child,
+    ),
+  ),
+);
+
+// ── Router ─────────────────────────────────────────────────────────────────────
 
 final appRouter = GoRouter(
   initialLocation: '/splash',
@@ -35,30 +70,39 @@ final appRouter = GoRouter(
     return null;
   },
   routes: [
-    GoRoute(path: '/splash',    builder: (_, __) => const SplashScreen()),
-    GoRoute(path: '/onboarding',builder: (_, __) => const OnboardingScreen()),
-    GoRoute(path: '/login',     builder: (_, __) => const LoginScreen()),
-    GoRoute(path: '/register',  builder: (_, __) => const RegisterScreen()),
-    GoRoute(path: '/otp',       builder: (c, s) => OtpScreen(email: s.extra as String? ?? '')),
-    GoRoute(path: '/book',      builder: (_, __) => const BookAppointmentScreen()),
-    GoRoute(path: '/appointments', builder: (_, __) => const AppointmentHistoryScreen()),
-    GoRoute(path: '/treatments',   builder: (_, __) => const th.TreatmentHistoryScreen()),
-    GoRoute(path: '/gallery',      builder: (_, __) => const GalleryScreen()),
-    GoRoute(path: '/membership',   builder: (_, __) => const MembershipScreen()),
-    GoRoute(path: '/loyalty',      builder: (_, __) => const LoyaltyScreen()),
-    GoRoute(path: '/payments',     builder: (_, __) => const PaymentsScreen()),
-    GoRoute(path: '/chat',         builder: (_, __) => const ChatScreen()),
-    GoRoute(path: '/reviews',      builder: (_, __) => const ReviewsScreen()),
-    GoRoute(path: '/settings',     builder: (_, __) => const SettingsScreen()),
+    GoRoute(path: '/splash',     builder: (_, __) => const SplashScreen()),
+    GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
+
+    // Auth — fade transition
+    GoRoute(path: '/login',    pageBuilder: (_, __) => _fadePage(const LoginScreen())),
+    GoRoute(path: '/register', pageBuilder: (_, __) => _fadePage(const RegisterScreen())),
+    GoRoute(path: '/otp',      pageBuilder: (c, s)  => _fadePage(OtpScreen(email: s.extra as String? ?? ''))),
+
+    // Booking & history — slide up (modal feel)
+    GoRoute(path: '/book',         pageBuilder: (_, __) => _slideUpPage(const BookAppointmentScreen())),
+    GoRoute(path: '/appointments', pageBuilder: (_, __) => _fadePage(const AppointmentHistoryScreen())),
+    GoRoute(path: '/treatments',   pageBuilder: (_, __) => _fadePage(const th.TreatmentHistoryScreen())),
+    GoRoute(path: '/gallery',      pageBuilder: (_, __) => _fadePage(const GalleryScreen())),
+
+    // Account screens — fade
+    GoRoute(path: '/membership', pageBuilder: (_, __) => _fadePage(const MembershipScreen())),
+    GoRoute(path: '/loyalty',    pageBuilder: (_, __) => _fadePage(const LoyaltyScreen())),
+    GoRoute(path: '/payments',   pageBuilder: (_, __) => _fadePage(const PaymentsScreen())),
+    GoRoute(path: '/reviews',    pageBuilder: (_, __) => _fadePage(const ReviewsScreen())),
+    GoRoute(path: '/settings',   pageBuilder: (_, __) => _fadePage(const SettingsScreen())),
+
+    // Chat — slide up
+    GoRoute(path: '/chat', pageBuilder: (_, __) => _slideUpPage(const ChatScreen())),
+
     // Bottom-nav shell
     StatefulShellRoute.indexedStack(
       builder: (context, state, shell) => _AppShell(shell: shell),
       branches: [
-        StatefulShellBranch(routes: [GoRoute(path: '/home',       builder: (_, __) => const HomeScreen())]),
-        StatefulShellBranch(routes: [GoRoute(path: '/services',   builder: (_, __) => const ServicesScreen())]),
-        StatefulShellBranch(routes: [GoRoute(path: '/appt-tab',   builder: (_, __) => const AppointmentHistoryScreen())]),
-        StatefulShellBranch(routes: [GoRoute(path: '/notif-tab',  builder: (_, __) => const NotificationsScreen())]),
-        StatefulShellBranch(routes: [GoRoute(path: '/profile-tab',builder: (_, __) => const ProfileScreen())]),
+        StatefulShellBranch(routes: [GoRoute(path: '/home',        builder: (_, __) => const HomeScreen())]),
+        StatefulShellBranch(routes: [GoRoute(path: '/services',    builder: (_, __) => const ServicesScreen())]),
+        StatefulShellBranch(routes: [GoRoute(path: '/appt-tab',    builder: (_, __) => const AppointmentHistoryScreen())]),
+        StatefulShellBranch(routes: [GoRoute(path: '/notif-tab',   builder: (_, __) => const NotificationsScreen())]),
+        StatefulShellBranch(routes: [GoRoute(path: '/profile-tab', builder: (_, __) => const ProfileScreen())]),
       ],
     ),
   ],
@@ -69,38 +113,55 @@ void markLoggedOut() { _isLoggedIn = false; }
 void markOnboarded() { _hasSeenOnboarding = true; }
 bool get hasSeenOnboarding => _hasSeenOnboarding;
 
-// ── Bottom nav shell ───────────────────────────────────────────────────────────
+// ── Glassmorphism bottom nav shell ─────────────────────────────────────────────
 class _AppShell extends StatelessWidget {
   final StatefulNavigationShell shell;
   const _AppShell({required this.shell});
 
   static const _items = [
-    BottomNavigationBarItem(icon: Icon(Icons.home_outlined),          activeIcon: Icon(Icons.home),          label: 'Home'),
-    BottomNavigationBarItem(icon: Icon(Icons.spa_outlined),            activeIcon: Icon(Icons.spa),            label: 'Services'),
-    BottomNavigationBarItem(icon: Icon(Icons.calendar_month_outlined), activeIcon: Icon(Icons.calendar_month), label: 'Bookings'),
-    BottomNavigationBarItem(icon: Icon(Icons.notifications_outlined),  activeIcon: Icon(Icons.notifications),  label: 'Alerts'),
-    BottomNavigationBarItem(icon: Icon(Icons.person_outline),          activeIcon: Icon(Icons.person),         label: 'Profile'),
+    BottomNavigationBarItem(icon: Icon(Icons.home_outlined),          activeIcon: Icon(Icons.home_rounded),         label: 'Home'),
+    BottomNavigationBarItem(icon: Icon(Icons.spa_outlined),            activeIcon: Icon(Icons.spa_rounded),           label: 'Services'),
+    BottomNavigationBarItem(icon: Icon(Icons.calendar_month_outlined), activeIcon: Icon(Icons.calendar_month_rounded),label: 'Bookings'),
+    BottomNavigationBarItem(icon: Icon(Icons.notifications_outlined),  activeIcon: Icon(Icons.notifications_rounded), label: 'Alerts'),
+    BottomNavigationBarItem(icon: Icon(Icons.person_outline),          activeIcon: Icon(Icons.person_rounded),        label: 'Profile'),
   ];
 
   @override
   Widget build(BuildContext context) {
     final p = HaTheme.of(context);
     return Scaffold(
+      extendBody: true,        // body renders behind the glass nav
       body: shell,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(color: p.surface, border: Border(top: BorderSide(color: p.border))),
-        child: BottomNavigationBar(
-          currentIndex: shell.currentIndex,
-          onTap: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
-          items: _items,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedItemColor: kGold,
-          unselectedItemColor: p.textMuted,
-          type: BottomNavigationBarType.fixed,
-          selectedFontSize: 10, unselectedFontSize: 10,
-          selectedLabelStyle: p.body(10, weight: FontWeight.w600),
-          unselectedLabelStyle: p.body(10),
+      bottomNavigationBar: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: Container(
+            decoration: BoxDecoration(
+              color: p.isDark
+                  ? Colors.black.withValues(alpha: 0.60)
+                  : Colors.white.withValues(alpha: 0.82),
+              border: Border(top: BorderSide(
+                color: p.isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.06),
+                width: 0.5,
+              )),
+            ),
+            child: BottomNavigationBar(
+              currentIndex: shell.currentIndex,
+              onTap: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
+              items: _items,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              selectedItemColor: kGold,
+              unselectedItemColor: p.textMuted,
+              type: BottomNavigationBarType.fixed,
+              selectedFontSize: 10,
+              unselectedFontSize: 10,
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400),
+            ),
+          ),
         ),
       ),
     );
