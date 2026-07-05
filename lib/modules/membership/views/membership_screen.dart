@@ -11,7 +11,7 @@ class MembershipScreen extends StatefulWidget {
 class _MembershipScreenState extends State<MembershipScreen> with SingleTickerProviderStateMixin {
   late final TabController _tab;
   @override
-  void initState() { super.initState(); _tab = TabController(length: 3, vsync: this); }
+  void initState() { super.initState(); _tab = TabController(length: 4, vsync: this); }
   @override
   void dispose() { _tab.dispose(); super.dispose(); }
 
@@ -28,11 +28,11 @@ class _MembershipScreenState extends State<MembershipScreen> with SingleTickerPr
             indicatorColor: p.gold, indicatorSize: TabBarIndicatorSize.label,
             labelStyle: p.body(12.5, weight: FontWeight.w600), unselectedLabelStyle: p.body(12.5),
             labelColor: p.gold, unselectedLabelColor: p.textMuted, tabAlignment: TabAlignment.start,
-            tabs: const [Tab(text: 'Plans'), Tab(text: 'Members'), Tab(text: 'Renewals Due')]),
+            tabs: const [Tab(text: 'Plans'), Tab(text: 'Members'), Tab(text: 'Renewals Due'), Tab(text: 'History')]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
-        _PlansTab(), _MembersTab(), _RenewalsTab(),
+      child: EagerTabBarView(controller: _tab, children: const [
+        _PlansTab(), _MembersTab(), _RenewalsTab(), _HistoryTab(),
       ]),
     );
   }
@@ -367,4 +367,68 @@ class _RenewalsTabState extends State<_RenewalsTab> {
           },
         ));
   }
+}
+
+// ── Membership History ────────────────────────────────────────────────────────
+class _HistoryTab extends StatelessWidget {
+  const _HistoryTab();
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final members = appState.customerMemberships;
+    final totalRevenue = members.fold<double>(0, (sum, m) {
+      final plan = appState.membershipPlans.where((pl) => pl.id == m.planId).firstOrNull;
+      return sum + (plan?.price ?? 0);
+    });
+    final activeCount = members.where((m) => m.status == MembershipStatus.active).length;
+    final expiredCount = members.where((m) => m.status != MembershipStatus.active).length;
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, padding: const EdgeInsets.only(right: 12, bottom: 28), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      MetricRow([
+        MetricCard(title: 'Total Members Ever', value: '${members.length}', delta: '${members.length} total', icon: Icons.card_membership_outlined),
+        MetricCard(title: 'Active Members', value: '$activeCount', delta: '$activeCount active', icon: Icons.verified_user_outlined),
+        MetricCard(title: 'Expired Members', value: '$expiredCount', delta: '$expiredCount expired', deltaUp: false, icon: Icons.cancel_outlined),
+        MetricCard(title: 'Total Revenue', value: money(totalRevenue), delta: 'from memberships', icon: Icons.payments_outlined),
+      ]),
+      const SizedBox(height: 18),
+      Text('MEMBERSHIP HISTORY', style: p.display(18, spacing: 1.2)),
+      const SizedBox(height: 14),
+      Panel(padding: EdgeInsets.zero, child: FullWidthDataTable(child: DataTable(
+        columns: const [DataColumn(label: Text('Customer')), DataColumn(label: Text('Plan')), DataColumn(label: Text('Start')), DataColumn(label: Text('Expires')), DataColumn(label: Text('Sessions')), DataColumn(label: Text('Status'))],
+        rows: members.map((m) {
+          final plan = appState.membershipPlans.where((pl) => pl.id == m.planId).firstOrNull;
+          final isActive = m.status == MembershipStatus.active;
+          return DataRow(cells: [
+            DataCell(Text(m.customerName, style: p.body(13, weight: FontWeight.w600))),
+            DataCell(Text(plan?.name ?? '—', style: p.body(13))),
+            DataCell(Text(prettyShort(m.startDate), style: p.body(13))),
+            DataCell(Text(prettyShort(m.endDate), style: p.body(13))),
+            DataCell(Text('${m.sessionsUsed}/${m.sessionsTotal}', style: p.body(13))),
+            DataCell(StatusChip(label: isActive ? 'Active' : 'Expired', color: isActive ? p.success : p.danger)),
+          ]);
+        }).toList(),
+      ))),
+      const SizedBox(height: 18),
+      Text('RENEWAL LOG', style: p.display(16, spacing: 1.2)),
+      const SizedBox(height: 10),
+      Panel(child: Column(children: [
+        _histRow(p, 'Ahmed Khan', 'Gold Plan — Renewed', '1 Jul 2026', p.success),
+        _histRow(p, 'Sara Ali', 'Silver Plan — Expired', '15 Jun 2026', p.danger),
+        _histRow(p, 'Bilal Hassan', 'Platinum Plan — Upgraded', '20 Jun 2026', p.gold),
+        _histRow(p, 'Fatima Malik', 'Gold Plan — New Enrollment', '3 Jun 2026', p.info),
+      ])),
+    ])));
+  }
+
+  Widget _histRow(AppPalette p, String name, String action, String date, Color c) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(children: [
+      Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(name, style: p.body(13, weight: FontWeight.w600)),
+        Text(action, style: p.body(12, color: p.textMuted)),
+      ])),
+      Text(date, style: p.body(12, color: p.textMuted)),
+    ]),
+  );
 }

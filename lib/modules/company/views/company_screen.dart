@@ -32,7 +32,7 @@ class _CompanyScreenState extends State<CompanyScreen> with SingleTickerProvider
               Tab(text: 'Designations'), Tab(text: 'Working Hours'), Tab(text: 'Holidays')]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
+      child: EagerTabBarView(controller: _tab, children: const [
         _ProfileTab(), _BranchesTab(), _DepartmentsTab(),
         _DesignationsTab(), _WorkingHoursTab(), _HolidaysTab(),
       ]),
@@ -464,13 +464,13 @@ class _WorkingHoursTabState extends State<_WorkingHoursTab> {
     return Column(children: [
       Row(children: [const Spacer(), GoldButton(label: 'Save Schedule', icon: Icons.save_outlined, onTap: () { appState.touch(); toast(context, 'Working hours saved successfully'); })]),
       const SizedBox(height: 12),
-      Expanded(child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(child: Panel(child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('WEEKLY SCHEDULE', style: p.display(18, spacing: 0.5)),
         const SizedBox(height: 6),
         Text('Set clinic operating hours for each day of the week', style: p.body(12.5, color: p.textMuted)),
         const SizedBox(height: 20),
         ...days.map((day) => _DayRow(day: day, onChanged: () => setState(() {}))),
-      ]))),
+      ]))))),
     ]);
   }
 }
@@ -490,32 +490,35 @@ class _DayRowState extends State<_DayRow> {
     final d = widget.day;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: Row(children: [
-        SizedBox(width: 50, child: Text(d.day, style: p.body(13, weight: FontWeight.w700))),
-        const SizedBox(width: 16),
-        Switch(value: d.isOpen, onChanged: (v) { d.isOpen = v; widget.onChanged(); }, activeColor: p.gold),
-        const SizedBox(width: 16),
-        if (!d.isOpen)
-          Expanded(child: Container(height: 44, alignment: Alignment.centerLeft,
-            decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Text('Closed', style: p.body(13, color: p.textMuted))))
-        else ...[
-          _timeField(p, 'Open', d.openTime, (v) { d.openTime = v; widget.onChanged(); }),
-          const SizedBox(width: 10),
-          Text('to', style: p.body(13, color: p.textMuted)),
-          const SizedBox(width: 10),
-          _timeField(p, 'Close', d.closeTime, (v) { d.closeTime = v; widget.onChanged(); }),
-          const SizedBox(width: 20),
-          Text('Break:', style: p.body(12.5, color: p.textMuted)),
-          const SizedBox(width: 10),
-          _timeField(p, 'Start', d.breakStart, (v) { d.breakStart = v; widget.onChanged(); }),
-          const SizedBox(width: 8),
-          Text('–', style: p.body(13, color: p.textMuted)),
-          const SizedBox(width: 8),
-          _timeField(p, 'End', d.breakEnd, (v) { d.breakEnd = v; widget.onChanged(); }),
-        ],
-      ]),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          SizedBox(width: 50, child: Text(d.day, style: p.body(13, weight: FontWeight.w700))),
+          const SizedBox(width: 16),
+          Switch(value: d.isOpen, onChanged: (v) { d.isOpen = v; widget.onChanged(); }, activeColor: p.gold),
+          const SizedBox(width: 16),
+          if (!d.isOpen)
+            SizedBox(width: 200, child: Container(height: 44, alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Text('Closed', style: p.body(13, color: p.textMuted))))
+          else ...[
+            _timeField(p, 'Open', d.openTime, (v) { d.openTime = v; widget.onChanged(); }),
+            const SizedBox(width: 10),
+            Text('to', style: p.body(13, color: p.textMuted)),
+            const SizedBox(width: 10),
+            _timeField(p, 'Close', d.closeTime, (v) { d.closeTime = v; widget.onChanged(); }),
+            const SizedBox(width: 20),
+            Text('Break:', style: p.body(12.5, color: p.textMuted)),
+            const SizedBox(width: 10),
+            _timeField(p, 'Start', d.breakStart, (v) { d.breakStart = v; widget.onChanged(); }),
+            const SizedBox(width: 8),
+            Text('–', style: p.body(13, color: p.textMuted)),
+            const SizedBox(width: 8),
+            _timeField(p, 'End', d.breakEnd, (v) { d.breakEnd = v; widget.onChanged(); }),
+          ],
+        ]),
+      ),
     );
   }
 

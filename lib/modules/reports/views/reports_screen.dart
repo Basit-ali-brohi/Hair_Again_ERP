@@ -42,7 +42,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       child: Column(children: [
         _TabRow(controller: _tc),
         const SizedBox(height: 2),
-        Expanded(child: TabBarView(controller: _tc, children: [
+        Expanded(child: EagerTabBarView(controller: _tc, children: [
           _OverviewTab(period: _period),
           _RevenueTab(period: _period),
           _PatientTab(period: _period),

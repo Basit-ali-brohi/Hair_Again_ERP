@@ -31,7 +31,7 @@ class _HairPatchScreenState extends State<HairPatchScreen> with SingleTickerProv
             tabs: const [Tab(text: 'Catalog'), Tab(text: 'Orders'), Tab(text: 'Fittings'), Tab(text: 'Maintenance')]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
+      child: EagerTabBarView(controller: _tab, children: const [
         _CatalogTab(), _OrdersTab(), _FittingsTab(), _MaintenanceTab(),
       ]),
     );

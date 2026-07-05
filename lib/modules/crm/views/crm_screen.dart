@@ -1,5 +1,8 @@
 // modules/crm/views — master-detail patient list + dossier, Norwood register
 // overlay, and live add/filter/update/delete against the shared store.
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/core.dart';
@@ -134,51 +137,119 @@ class CrmScreenState extends State<CrmScreen> {
   }
 }
 
-class _Dossier extends StatelessWidget {
+class _Dossier extends StatefulWidget {
   final Patient patient;
   final VoidCallback onEdit, onDelete;
   const _Dossier({required this.patient, required this.onEdit, required this.onDelete});
+  @override
+  State<_Dossier> createState() => _DossierState();
+}
+
+class _DossierState extends State<_Dossier> with SingleTickerProviderStateMixin {
+  late final TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  Patient get patient => widget.patient;
 
   @override
   Widget build(BuildContext context) {
     final p = pal(context);
     return Panel(
-      child: ScrollArea(builder: (sc) => SingleChildScrollView(
-        controller: sc,
-        padding: const EdgeInsets.only(right: 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(width: 64, height: 64, alignment: Alignment.center, decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(8)), child: Text(patient.initials, style: p.display(28, color: Colors.black87))),
-            const SizedBox(width: 16),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(patient.name, style: p.display(32)),
-              const SizedBox(height: 4),
-              Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [StatusChip(label: patient.status.label, color: p.statusColor(patient.status)), Text('${patient.gender} • ${patient.age} yrs • ${patient.city}', style: p.body(12.5, color: p.textMuted))]),
-            ])),
-            GhostButton(label: 'Edit', icon: Icons.edit_outlined, onTap: onEdit),
-            const SizedBox(width: 8),
-            _DeleteButton(onTap: onDelete),
-          ]),
-          const SizedBox(height: 22),
-          LayoutBuilder(builder: (context, c) {
-            final contact = _info(p, 'CONTACT', [_row(p, Icons.phone_outlined, patient.phone), _row(p, Icons.email_outlined, patient.email), _row(p, Icons.location_on_outlined, patient.city)]);
-            final norwood = _norwood(p);
-            if (c.maxWidth > 560) return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: contact), const SizedBox(width: 16), Expanded(child: norwood)]);
-            return Column(children: [contact, const SizedBox(height: 16), norwood]);
-          }),
-          const SizedBox(height: 22),
-          const SectionTitle('TRANSPLANT JOURNEY', sub: 'Tap a milestone to toggle completion'),
-          const SizedBox(height: 14),
-          ...List.generate(patient.journey.length, (i) => _timeline(context, p, i)),
-          const SizedBox(height: 8),
-          GhostButton(label: 'Add Journey Milestone', icon: Icons.add, onTap: () => _addMilestone(context)),
-          const SizedBox(height: 22),
-          _beforeAfterGallery(context, p),
-          const SizedBox(height: 22),
-          _communicationLog(context, p),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // ── Header row ──────────────────────────────────────────────────────
+        Row(children: [
+          Container(width: 64, height: 64, alignment: Alignment.center, decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(8)), child: Text(patient.initials, style: p.display(28, color: Colors.black87))),
+          const SizedBox(width: 16),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(patient.name, style: p.display(32)),
+            const SizedBox(height: 4),
+            Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [StatusChip(label: patient.status.label, color: p.statusColor(patient.status)), Text('${patient.gender} • ${patient.age} yrs • ${patient.city}', style: p.body(12.5, color: p.textMuted))]),
+          ])),
+          GhostButton(label: 'Export PDF', icon: Icons.picture_as_pdf_outlined, onTap: () => showPdfPreview(context, title: '${patient.name} — Dossier', build: () => buildPatientPdf(patient))),
+          const SizedBox(width: 8),
+          GhostButton(label: 'Edit', icon: Icons.edit_outlined, onTap: widget.onEdit),
+          const SizedBox(width: 8),
+          _DeleteButton(onTap: widget.onDelete),
         ]),
-      )),
+        const SizedBox(height: 14),
+        // ── TabBar ──────────────────────────────────────────────────────────
+        Container(
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: p.border))),
+          child: TabBar(
+            controller: _tab,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            dividerColor: Colors.transparent,
+            indicatorColor: p.gold,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle: p.body(13, weight: FontWeight.w600),
+            unselectedLabelStyle: p.body(13),
+            labelColor: p.gold,
+            unselectedLabelColor: p.textMuted,
+            tabs: const [Tab(text: 'Overview'), Tab(text: 'Medical History'), Tab(text: 'Notes'), Tab(text: 'Documents')],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // ── TabBarView ──────────────────────────────────────────────────────
+        Expanded(child: EagerTabBarView(controller: _tab, children: [
+          _OverviewTab(patient: patient),
+          _MedicalHistoryTab(patient: patient),
+          _NotesTab(patient: patient),
+          _DocumentsTab(patient: patient),
+        ])),
+      ]),
     );
+  }
+
+}
+
+// ── Overview Tab ──────────────────────────────────────────────────────────────
+class _OverviewTab extends StatefulWidget {
+  final Patient patient;
+  const _OverviewTab({required this.patient});
+  @override
+  State<_OverviewTab> createState() => _OverviewTabState();
+}
+
+class _OverviewTabState extends State<_OverviewTab> {
+  Patient get patient => widget.patient;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.only(right: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        LayoutBuilder(builder: (context, c) {
+          final contact = _info(p, 'CONTACT', [_row(p, Icons.phone_outlined, patient.phone), _row(p, Icons.email_outlined, patient.email), _row(p, Icons.location_on_outlined, patient.city)]);
+          final norwood = _norwood(p);
+          if (c.maxWidth > 560) return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: contact), const SizedBox(width: 16), Expanded(child: norwood)]);
+          return Column(children: [contact, const SizedBox(height: 16), norwood]);
+        }),
+        const SizedBox(height: 22),
+        const SectionTitle('TRANSPLANT JOURNEY', sub: 'Tap a milestone to toggle completion'),
+        const SizedBox(height: 14),
+        ...List.generate(patient.journey.length, (i) => _timeline(context, p, i)),
+        const SizedBox(height: 8),
+        GhostButton(label: 'Add Journey Milestone', icon: Icons.add, onTap: () => _addMilestone(context)),
+        const SizedBox(height: 22),
+        _beforeAfterGallery(context, p),
+        const SizedBox(height: 22),
+        _communicationLog(context, p),
+      ]),
+    ));
   }
 
   Widget _info(AppPalette p, String title, List<Widget> rows) => Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)), const SizedBox(height: 12), ...rows]));
@@ -254,12 +325,6 @@ class _Dossier extends StatelessWidget {
   }
 
   Widget _beforeAfterGallery(BuildContext context, AppPalette p) {
-    final photos = [
-      (label: 'Before Surgery', date: 'Mar 2026', type: 'before'),
-      (label: 'Day-7 Post-Op', date: 'Apr 2026', type: 'after'),
-      (label: 'Month-3 Follow-up', date: 'Jun 2026', type: 'after'),
-      (label: 'Month-6 Review', date: 'Sep 2026', type: 'after'),
-    ];
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -267,46 +332,122 @@ class _Dossier extends StatelessWidget {
           const SizedBox(height: 3),
           Text('Progress photo documentation', style: p.body(11.5, color: p.textMuted)),
         ])),
-        GhostButton(label: 'Add Photo', icon: Icons.add_a_photo_outlined, onTap: () => toast(context, 'Photo upload feature — attach from file system')),
+        GhostButton(label: 'Add Photo', icon: Icons.add_a_photo_outlined, onTap: () => _pickPhoto(context, p)),
       ]),
       const SizedBox(height: 14),
-      SizedBox(
-        height: 130,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: photos.length + 1,
-          separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (_, i) {
-            if (i == photos.length) {
-              return GestureDetector(
-                onTap: () => toast(context, 'Photo upload feature — attach from file system'),
-                child: MouseRegion(cursor: SystemMouseCursors.click, child: Container(
-                  width: 110,
-                  decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border, style: BorderStyle.solid)),
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_a_photo_outlined, color: p.textMuted, size: 22), const SizedBox(height: 8), Text('Add Photo', style: p.body(11, color: p.textMuted))]),
-                )),
+      if (patient.photos.isEmpty)
+        GestureDetector(
+          onTap: () => _pickPhoto(context, p),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Container(
+              height: 110,
+              decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+              child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.add_photo_alternate_outlined, size: 32, color: p.textMuted.withValues(alpha: 0.5)),
+                const SizedBox(height: 8),
+                Text('No photos yet — click to add a before/after image', style: p.body(12, color: p.textMuted)),
+              ])),
+            ),
+          ),
+        )
+      else
+        SizedBox(
+          height: 140,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: patient.photos.length + 1,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, i) {
+              if (i == patient.photos.length) {
+                return GestureDetector(
+                  onTap: () => _pickPhoto(context, p),
+                  child: MouseRegion(cursor: SystemMouseCursors.click, child: Container(
+                    width: 110,
+                    decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.add_a_photo_outlined, color: p.textMuted, size: 22),
+                      const SizedBox(height: 8),
+                      Text('Add Photo', style: p.body(11, color: p.textMuted)),
+                    ]),
+                  )),
+                );
+              }
+              final photo = patient.photos[i];
+              final file = File(photo.path);
+              final exists = file.existsSync();
+              return Container(
+                width: 120,
+                decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.gold.withValues(alpha: 0.35))),
+                child: Column(children: [
+                  Expanded(child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                    child: exists
+                      ? Image.file(file, fit: BoxFit.cover, width: 120)
+                      : Center(child: Icon(Icons.broken_image_outlined, size: 28, color: p.textMuted.withValues(alpha: 0.5))),
+                  )),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(photo.label, style: p.body(10.5, weight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(photo.date, style: p.body(10, color: p.textMuted)),
+                    ]),
+                  ),
+                ]),
               );
-            }
-            final photo = photos[i];
-            final isBefore = photo.type == 'before';
-            return Container(
-              width: 110,
-              decoration: BoxDecoration(color: isBefore ? p.surfaceAlt : p.gold.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: isBefore ? p.border : p.gold.withValues(alpha: 0.3))),
-              child: Column(children: [
-                Expanded(child: Container(decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: const BorderRadius.vertical(top: Radius.circular(8))), child: Center(child: Icon(Icons.person_outlined, size: 36, color: p.textMuted.withValues(alpha: 0.5))))),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(photo.label, style: p.body(10.5, weight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text(photo.date, style: p.body(10, color: p.textMuted)),
-                  ]),
-                ),
-              ]),
-            );
-          },
+            },
+          ),
+        ),
+    ]);
+  }
+
+  Future<void> _pickPhoto(BuildContext context, AppPalette p) async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image, allowMultiple: false);
+    if (result == null || result.files.isEmpty) return;
+    final path = result.files.first.path;
+    if (path == null) return;
+    if (!context.mounted) return;
+
+    final labelCtrl = TextEditingController();
+    final dateCtrl = TextEditingController(text: prettyShort(DateTime.now()));
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (_) => Dialog(
+        backgroundColor: p.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+        child: Container(
+          width: 380,
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Container(padding: const EdgeInsets.all(9), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.add_a_photo_outlined, color: p.gold, size: 18)),
+              const SizedBox(width: 12),
+              Text('LABEL PHOTO', style: p.display(24)),
+            ]),
+            const SizedBox(height: 18),
+            FormField2(label: 'Label', controller: labelCtrl, hint: 'e.g. Before Surgery, Month-3 Follow-up'),
+            const SizedBox(height: 14),
+            FormField2(label: 'Date', controller: dateCtrl, hint: 'e.g. Jul 2026'),
+            const SizedBox(height: 22),
+            Row(children: [
+              Expanded(child: GhostButton(label: 'Cancel', onTap: () => Navigator.pop(context, false))),
+              const SizedBox(width: 12),
+              Expanded(child: GoldButton(label: 'Add Photo', icon: Icons.check, onTap: () => Navigator.pop(context, true))),
+            ]),
+          ]),
         ),
       ),
-    ]);
+    );
+
+    if (confirmed != true) return;
+    patient.photos.add(PatientPhoto(
+      label: labelCtrl.text.trim().isEmpty ? 'Photo' : labelCtrl.text.trim(),
+      date: dateCtrl.text.trim(),
+      path: path,
+    ));
+    appState.touch();
   }
 
   Widget _communicationLog(BuildContext ctx, AppPalette p) {
@@ -337,6 +478,297 @@ class _Dossier extends StatelessWidget {
         Text(log.date, style: p.body(11, color: p.textMuted)),
       ]))),
     ]);
+  }
+}
+
+// ── Medical History Tab ───────────────────────────────────────────────────────
+class _MedicalHistoryTab extends StatefulWidget {
+  final Patient patient;
+  const _MedicalHistoryTab({required this.patient});
+  @override
+  State<_MedicalHistoryTab> createState() => _MedicalHistoryTabState();
+}
+
+class _MedicalHistoryTabState extends State<_MedicalHistoryTab> {
+  Patient get patient => widget.patient;
+
+  void _showAddMedicalNote(BuildContext context) {
+    final p = pal(context);
+    final cond = TextEditingController();
+    final dateCtrl = TextEditingController(text: prettyShort(DateTime.now()));
+    final notesCtrl = TextEditingController();
+    showDialog(context: context, builder: (_) => Dialog(
+      backgroundColor: p.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+      child: Container(
+        width: 480, padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('ADD MEDICAL NOTE', style: p.display(24)),
+          const SizedBox(height: 18),
+          FormField2(label: 'Condition / Treatment', controller: cond, hint: 'e.g. Alopecia Areata, Minoxidil 5%'),
+          const SizedBox(height: 14),
+          FormField2(label: 'Date', controller: dateCtrl, hint: 'e.g. Jul 2026'),
+          const SizedBox(height: 14),
+          FormField2(label: 'Notes', controller: notesCtrl, hint: 'Additional details…', maxLines: 3),
+          const SizedBox(height: 22),
+          Row(children: [
+            Expanded(child: GhostButton(label: 'Cancel', onTap: () => Navigator.pop(context))),
+            const SizedBox(width: 12),
+            Expanded(child: GoldButton(label: 'Add', onTap: () {
+              if (cond.text.trim().isEmpty) return;
+              patient.medicalNotes.add(MedicalNote(id: 'MN-${patient.medicalNotes.length + 1}', condition: cond.text.trim(), date: dateCtrl.text.trim(), notes: notesCtrl.text.trim()));
+              appState.touch();
+              setState(() {});
+              Navigator.pop(context);
+            })),
+          ]),
+        ]),
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.only(right: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Hair Loss History
+        Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('HAIR LOSS HISTORY', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)),
+          const SizedBox(height: 14),
+          Row(children: [
+            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(8)), child: Text('NW ${roman(patient.norwood)}', style: p.body(14, color: Colors.black87, weight: FontWeight.w800))),
+            const SizedBox(width: 16),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Current Stage: Norwood ${roman(patient.norwood)}', style: p.body(14, weight: FontWeight.w700)),
+              Text(norwoodDesc(patient.norwood), style: p.body(12.5, color: p.textMuted)),
+              const SizedBox(height: 8),
+              Row(children: List.generate(7, (i) => Expanded(child: Container(height: 8, margin: EdgeInsets.only(right: i < 6 ? 4 : 0), decoration: BoxDecoration(color: i < patient.norwood ? p.gold : p.border, borderRadius: BorderRadius.circular(4)))))),
+            ])),
+          ]),
+        ])),
+        const SizedBox(height: 18),
+        Row(children: [
+          Expanded(child: Text('MEDICAL CONDITIONS & PREVIOUS TREATMENTS', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0))),
+          GoldButton(label: 'Add Medical Note', icon: Icons.add, onTap: () => _showAddMedicalNote(context)),
+        ]),
+        const SizedBox(height: 12),
+        if (patient.medicalNotes.isEmpty)
+          Container(padding: const EdgeInsets.all(24), alignment: Alignment.center, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Text('No medical notes recorded yet.', style: p.body(13, color: p.textMuted)))
+        else
+          Panel(padding: EdgeInsets.zero, child: FullWidthDataTable(child: DataTable(
+            headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+            columnSpacing: 16, horizontalMargin: 20,
+            columns: [
+              DataColumn(label: Text('Condition / Treatment', style: p.body(12, weight: FontWeight.w700))),
+              DataColumn(label: Text('Date', style: p.body(12, weight: FontWeight.w700))),
+              DataColumn(label: Text('Notes', style: p.body(12, weight: FontWeight.w700))),
+              DataColumn(label: Text('', style: p.body(12))),
+            ],
+            rows: patient.medicalNotes.map((m) => DataRow(cells: [
+              DataCell(Text(m.condition, style: p.body(13, weight: FontWeight.w600))),
+              DataCell(Text(m.date, style: p.body(12.5, color: p.textMuted))),
+              DataCell(SizedBox(width: 200, child: Text(m.notes.isEmpty ? '—' : m.notes, style: p.body(12.5, color: p.textMuted), maxLines: 2, overflow: TextOverflow.ellipsis))),
+              DataCell(GestureDetector(onTap: () { patient.medicalNotes.remove(m); appState.touch(); setState(() {}); }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.delete_outline, size: 15, color: p.textMuted)))),
+            ])).toList(),
+          ))),
+        const SizedBox(height: 24),
+      ]),
+    ));
+  }
+}
+
+// ── Notes Tab ─────────────────────────────────────────────────────────────────
+class _NotesTab extends StatefulWidget {
+  final Patient patient;
+  const _NotesTab({required this.patient});
+  @override
+  State<_NotesTab> createState() => _NotesTabState();
+}
+
+class _NotesTabState extends State<_NotesTab> {
+  Patient get patient => widget.patient;
+
+  static const _categories = ['General', 'Follow-up', 'Complaint', 'Compliment'];
+
+  Color _catColor(AppPalette p, String cat) => switch (cat) {
+    'Follow-up' => p.info,
+    'Complaint' => p.danger,
+    'Compliment' => p.success,
+    _ => p.textMuted,
+  };
+
+  void _showAddNote(BuildContext context) {
+    final p = pal(context);
+    final contentCtrl = TextEditingController();
+    String category = 'General';
+    showDialog(context: context, builder: (_) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: p.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+      child: Container(
+        width: 480, padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('ADD NOTE', style: p.display(24)),
+          const SizedBox(height: 18),
+          FormField2(label: 'Note Content', controller: contentCtrl, hint: 'Write your note here…', maxLines: 5),
+          const SizedBox(height: 14),
+          Dropdown2<String>(label: 'Category', value: category, items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(), onChanged: (v) => ss(() => category = v ?? 'General')),
+          const SizedBox(height: 22),
+          Row(children: [
+            Expanded(child: GhostButton(label: 'Cancel', onTap: () => Navigator.pop(context))),
+            const SizedBox(width: 12),
+            Expanded(child: GoldButton(label: 'Save Note', onTap: () {
+              if (contentCtrl.text.trim().isEmpty) return;
+              patient.notes.add(PatientNote(
+                id: 'PN-${patient.notes.length + 1}',
+                content: contentCtrl.text.trim(),
+                date: prettyShort(DateTime.now()),
+                author: appState.currentUser?.name ?? 'Staff',
+                category: category,
+              ));
+              appState.touch();
+              setState(() {});
+              Navigator.pop(context);
+            })),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.only(right: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text('PATIENT NOTES', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0))),
+          GoldButton(label: 'Add Note', icon: Icons.add, onTap: () => _showAddNote(context)),
+        ]),
+        const SizedBox(height: 14),
+        if (patient.notes.isEmpty)
+          Container(padding: const EdgeInsets.all(24), alignment: Alignment.center, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Text('No notes yet — tap Add Note to create one.', style: p.body(13, color: p.textMuted)))
+        else
+          ...patient.notes.reversed.map((note) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: _catColor(p, note.category).withValues(alpha: 0.35))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  StatusChip(label: note.category, color: _catColor(p, note.category)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('${note.author} • ${note.date}', style: p.body(11.5, color: p.textMuted))),
+                  GestureDetector(onTap: () { patient.notes.remove(note); appState.touch(); setState(() {}); }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.delete_outline, size: 15, color: p.textMuted))),
+                ]),
+                const SizedBox(height: 10),
+                Text(note.content, style: p.body(13.5)),
+              ]),
+            ),
+          )),
+        const SizedBox(height: 24),
+      ]),
+    ));
+  }
+}
+
+// ── Documents Tab ─────────────────────────────────────────────────────────────
+class _DocumentsTab extends StatefulWidget {
+  final Patient patient;
+  const _DocumentsTab({required this.patient});
+  @override
+  State<_DocumentsTab> createState() => _DocumentsTabState();
+}
+
+class _DocumentsTabState extends State<_DocumentsTab> {
+  Patient get patient => widget.patient;
+
+  static const _docTypes = ['CNIC', 'Consent Form', 'Medical Report', 'Insurance', 'Before-Photo', 'After-Photo', 'Other'];
+
+  void _showAddDocument(BuildContext context) {
+    final p = pal(context);
+    final nameCtrl = TextEditingController();
+    final dateCtrl = TextEditingController(text: prettyShort(DateTime.now()));
+    final notesCtrl = TextEditingController();
+    String docType = 'Other';
+    showDialog(context: context, builder: (_) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: p.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+      child: Container(
+        width: 480, padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('ADD DOCUMENT', style: p.display(24)),
+          const SizedBox(height: 18),
+          FormField2(label: 'Document Name', controller: nameCtrl, hint: 'e.g. Consent Form — FUE Transplant'),
+          const SizedBox(height: 14),
+          Dropdown2<String>(label: 'Document Type', value: docType, items: _docTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(), onChanged: (v) => ss(() => docType = v ?? 'Other')),
+          const SizedBox(height: 14),
+          FormField2(label: 'Date', controller: dateCtrl, hint: 'e.g. Jul 2026'),
+          const SizedBox(height: 14),
+          FormField2(label: 'Notes (optional)', controller: notesCtrl, hint: 'Additional details…', maxLines: 2),
+          const SizedBox(height: 22),
+          Row(children: [
+            Expanded(child: GhostButton(label: 'Cancel', onTap: () => Navigator.pop(context))),
+            const SizedBox(width: 12),
+            Expanded(child: GoldButton(label: 'Add Document', onTap: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              patient.docsList.add(PatientDocument(
+                id: 'PD-${patient.docsList.length + 1}',
+                name: nameCtrl.text.trim(),
+                docType: docType,
+                date: dateCtrl.text.trim(),
+                notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+              ));
+              appState.touch();
+              setState(() {});
+              Navigator.pop(context);
+            })),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.only(right: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text('DOCUMENTS', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0))),
+          GoldButton(label: 'Add Document', icon: Icons.add, onTap: () => _showAddDocument(context)),
+        ]),
+        const SizedBox(height: 12),
+        if (patient.docsList.isEmpty)
+          Container(padding: const EdgeInsets.all(24), alignment: Alignment.center, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Text('No documents uploaded yet.', style: p.body(13, color: p.textMuted)))
+        else
+          Panel(padding: EdgeInsets.zero, child: FullWidthDataTable(child: DataTable(
+            headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+            columnSpacing: 16, horizontalMargin: 20,
+            columns: [
+              DataColumn(label: Text('Document Name', style: p.body(12, weight: FontWeight.w700))),
+              DataColumn(label: Text('Type', style: p.body(12, weight: FontWeight.w700))),
+              DataColumn(label: Text('Date', style: p.body(12, weight: FontWeight.w700))),
+              DataColumn(label: Text('Notes', style: p.body(12, weight: FontWeight.w700))),
+              DataColumn(label: Text('', style: p.body(12))),
+            ],
+            rows: patient.docsList.map((d) => DataRow(cells: [
+              DataCell(Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.insert_drive_file_outlined, size: 14, color: p.gold), const SizedBox(width: 8), Text(d.name, style: p.body(13, weight: FontWeight.w600))])),
+              DataCell(StatusChip(label: d.docType, color: p.info)),
+              DataCell(Text(d.date, style: p.body(12.5, color: p.textMuted))),
+              DataCell(SizedBox(width: 160, child: Text(d.notes ?? '—', style: p.body(12.5, color: p.textMuted), maxLines: 2, overflow: TextOverflow.ellipsis))),
+              DataCell(GestureDetector(onTap: () { patient.docsList.remove(d); appState.touch(); setState(() {}); }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.delete_outline, size: 15, color: p.textMuted)))),
+            ])).toList(),
+          ))),
+        const SizedBox(height: 24),
+      ]),
+    ));
   }
 }
 

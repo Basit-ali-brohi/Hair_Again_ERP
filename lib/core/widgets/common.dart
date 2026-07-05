@@ -1,5 +1,6 @@
 // core/widgets — shared UI building blocks used across every module
 // (scaffold, panels, buttons, metric cards, inputs, chips, theme toggle).
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
@@ -14,6 +15,32 @@ class ScreenScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = pal(context);
+    final isMobile = defaultTargetPlatform == TargetPlatform.android ||
+                      defaultTargetPlatform == TargetPlatform.iOS;
+    if (isMobile) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: p.display(22, spacing: 0.5)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: p.body(12, color: p.textMuted)),
+          ]),
+        ),
+        if (actions.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: actions),
+          ),
+        ],
+        const SizedBox(height: 10),
+        Divider(height: 1, thickness: 1, color: p.border),
+        const SizedBox(height: 8),
+        Expanded(child: child),
+      ]);
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 16, 28, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -48,7 +75,7 @@ class Panel extends StatelessWidget {
         color: p.surface,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: p.border),
-        boxShadow: p.isDark ? [] : [BoxShadow(color: const Color(0xFF0C4A26).withValues(alpha: 0.07), blurRadius: 20, offset: const Offset(0, 4))],
+        boxShadow: p.isDark ? [] : [BoxShadow(color: const Color(0xFF6B4500).withValues(alpha: 0.07), blurRadius: 20, offset: const Offset(0, 4))],
       ),
       child: child,
     );
@@ -104,7 +131,8 @@ class GhostButton extends StatefulWidget {
   final String label;
   final IconData? icon;
   final VoidCallback onTap;
-  const GhostButton({super.key, required this.label, this.icon, required this.onTap});
+  final bool dense;
+  const GhostButton({super.key, required this.label, this.icon, required this.onTap, this.dense = false});
   @override
   State<GhostButton> createState() => _GhostButtonState();
 }
@@ -122,9 +150,9 @@ class _GhostButtonState extends State<GhostButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(horizontal: widget.dense ? 12 : 16, vertical: widget.dense ? 9 : 12),
           decoration: BoxDecoration(color: _hover ? p.surfaceAlt : Colors.transparent, borderRadius: BorderRadius.circular(5), border: Border.all(color: _hover ? p.gold : p.border)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [if (widget.icon != null) ...[Icon(widget.icon, size: 17, color: p.text), const SizedBox(width: 8)], Text(widget.label, style: p.body(13, weight: FontWeight.w600))]),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [if (widget.icon != null) ...[Icon(widget.icon, size: widget.dense ? 16 : 17, color: p.text), const SizedBox(width: 7)], Text(widget.label, style: p.body(widget.dense ? 12.5 : 13, weight: FontWeight.w600))]),
         ),
       ),
     );
@@ -159,7 +187,6 @@ class _MetricCardState extends State<MetricCard> {
       onExit: (_) => setState(() => _hover = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        transform: Matrix4.translationValues(0, _hover ? -2 : 0, 0),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: p.surface,
@@ -167,7 +194,7 @@ class _MetricCardState extends State<MetricCard> {
           border: Border.all(color: _hover ? p.gold.withValues(alpha: 0.45) : p.border),
           boxShadow: p.isDark
               ? (_hover ? [BoxShadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 18, offset: const Offset(0, 8))] : [])
-              : [BoxShadow(color: const Color(0xFF0C4A26).withValues(alpha: _hover ? 0.10 : 0.06), blurRadius: _hover ? 24 : 16, offset: const Offset(0, 4))],
+              : [BoxShadow(color: const Color(0xFF6B4500).withValues(alpha: _hover ? 0.10 : 0.06), blurRadius: _hover ? 24 : 16, offset: const Offset(0, 4))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -217,10 +244,11 @@ class _MetricCardState extends State<MetricCard> {
 
           const SizedBox(height: 6),
 
-          Row(children: [
+          Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.access_time_outlined, size: 11, color: p.textMuted.withValues(alpha: 0.7)),
             const SizedBox(width: 4),
-            Expanded(
+            Flexible(
+              fit: FlexFit.loose,
               child: Text(
                 descText,
                 style: p.body(11.5, color: p.textMuted),
@@ -290,14 +318,14 @@ class FormField2 extends StatelessWidget {
 
 class Dropdown2<T> extends StatelessWidget {
   final String label;
-  final T value;
+  final T? value;
   final List<DropdownMenuItem<T>> items;
   final ValueChanged<T?> onChanged;
   const Dropdown2({super.key, required this.label, required this.value, required this.items, required this.onChanged});
   @override
   Widget build(BuildContext context) {
     final p = pal(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: p.body(12, color: p.textMuted, weight: FontWeight.w600)),
       const SizedBox(height: 7),
       Container(
@@ -346,6 +374,7 @@ class FilterDropdown<T> extends StatelessWidget {
           child: DropdownButton<T>(
             value: value,
             isDense: true,
+            menuWidth: 240,
             dropdownColor: p.surfaceAlt,
             borderRadius: BorderRadius.circular(5),
             icon: Icon(Icons.keyboard_arrow_down, color: p.textMuted, size: 18),
@@ -441,19 +470,101 @@ class QtyButton extends StatelessWidget {
 }
 
 /// Wraps a DataTable so it always fills the full available width while still
-/// allowing horizontal scroll when the screen is narrower than the table.
-class FullWidthDataTable extends StatelessWidget {
+/// allowing horizontal scroll (with a visible scrollbar) when content overflows.
+class FullWidthDataTable extends StatefulWidget {
   final Widget child;
   const FullWidthDataTable({super.key, required this.child});
   @override
+  State<FullWidthDataTable> createState() => _FullWidthDataTableState();
+}
+
+class _FullWidthDataTableState extends State<FullWidthDataTable> {
+  final _sc = ScrollController();
+  @override
+  void dispose() { _sc.dispose(); super.dispose(); }
+  @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (ctx, cst) => SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: cst.maxWidth),
-        child: child,
+    return LayoutBuilder(builder: (ctx, cst) => Scrollbar(
+      controller: _sc,
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        controller: _sc,
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: cst.maxWidth),
+          child: widget.child,
+        ),
       ),
     ));
+  }
+}
+
+/// Drop-in replacement for [TabBarView] that uses [IndexedStack] internally.
+/// Unlike [TabBarView], all children are always laid out (not lazily), which
+/// prevents the "Cannot hit test a render box with no size" error on Windows
+/// that occurs when the mouse pointer moves over un-rendered off-screen pages.
+class EagerTabBarView extends StatefulWidget {
+  final TabController controller;
+  final List<Widget> children;
+  const EagerTabBarView({super.key, required this.controller, required this.children});
+  @override
+  State<EagerTabBarView> createState() => _EagerTabBarViewState();
+}
+
+class _EagerTabBarViewState extends State<EagerTabBarView> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTabChange);
+  }
+
+  @override
+  void didUpdateWidget(EagerTabBarView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onTabChange);
+      widget.controller.addListener(_onTabChange);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTabChange);
+    super.dispose();
+  }
+
+  // Defer setState to post-frame so TabController listener callbacks that fire
+  // during the animation ticker (mid-layout) never trigger a synchronous build.
+  void _onTabChange() {
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.controller.index;
+    // Offstage keeps every tab laid out (preserving State) without painting or
+    // hit-testing inactive tabs. TickerMode pauses animations in inactive tabs.
+    // Stack + StackFit.expand ensures each child receives the same tight,
+    // bounded constraints regardless of Offstage status — eliminating the
+    // unbounded-width assertion that IndexedStack + Opacity triggered on first
+    // layout when constraints hadn't settled yet.
+    return Stack(
+      fit: StackFit.expand,
+      children: widget.children.asMap().entries.map((entry) {
+        final isActive = entry.key == active;
+        return Offstage(
+          offstage: !isActive,
+          child: TickerMode(
+            enabled: isActive,
+            child: entry.value,
+          ),
+        );
+      }).toList(),
+    );
   }
 }
 

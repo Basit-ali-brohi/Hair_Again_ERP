@@ -8,7 +8,7 @@ A comprehensive, professional-grade **Enterprise Resource Planning (ERP)** deskt
 
 Hair Again ERP is a full-featured clinic management solution that streamlines every aspect of running a hair transplant and care practice — from patient intake and surgical scheduling through to billing, inventory, staff HR, and business analytics.
 
-The application targets **Windows desktop** as the primary platform, delivering a fast, native experience with a sleek Obsidian & Gold design theme.
+The application targets **Windows desktop** as the primary platform, delivering a fast, native experience with a sleek Obsidian & Gold design theme. A companion **Flutter mobile app** (`hair_again_patient_app/`) lets patients book appointments, track their treatment journey, and stay connected with the clinic.
 
 ---
 
@@ -183,13 +183,35 @@ flutter build windows --release
 
 ---
 
+## Patient Mobile App
+
+The `hair_again_patient_app/` directory contains the companion Flutter mobile app (Android & iOS):
+
+- Appointment booking with step-by-step flow
+- Treatment history and progress timeline
+- Loyalty points, rewards, and redemption
+- Membership plan management
+- Before/After photo gallery
+- In-app chat with clinic support
+- Payment history and invoices
+- Reviews and feedback
+
+```bash
+cd hair_again_patient_app
+flutter pub get
+flutter run -d android   # or -d ios
+```
+
+---
+
 ## Design
 
-The UI follows a **Clinic-Premium** design language:
+The UI follows a **Clinic-Premium** design language consistent across both the ERP and mobile app:
 
-- **Dark mode**: Obsidian background (`#111814`) with Gold (`#C9A84C`) accents
-- **Light mode**: Clinical white with deep green (`#0C4A26`) brand color
-- Minimal border radii for a sharp, professional desktop feel
+- **Dark mode**: Obsidian background (`#0E0E12`) with Brushed Gold (`#C9A24B`) accents
+- **Light mode**: Warm ivory background (`#FBF9F5`) with the same gold accent
+- 5 selectable accent colors in Settings: Brushed Gold · Forest Green · Emerald · Sapphire · Rose
+- Premium typography: **Bebas Neue** for headings and KPIs, **Inter** for all body text
 - Consistent `Panel` cards, `FilterBar` toolbars, and `FullWidthDataTable` grids across all modules
 
 ---
@@ -201,3 +223,7 @@ This project is proprietary software developed for **Hair Again — Transplant &
 ---
 
 *Hair Again ERP — Built for professionals, by professionals.*
+
+---
+
+*Hair Again Clinic · Karachi, Pakistan*

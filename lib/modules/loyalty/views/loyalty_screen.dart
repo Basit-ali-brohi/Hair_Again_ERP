@@ -31,7 +31,7 @@ class _LoyaltyScreenState extends State<LoyaltyScreen> with SingleTickerProvider
             tabs: const [Tab(text: 'Dashboard'), Tab(text: 'Points Ledger'), Tab(text: 'Rewards'), Tab(text: 'Referrals')]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
+      child: EagerTabBarView(controller: _tab, children: const [
         _DashboardTab(), _PointsTab(), _RewardsTab(), _ReferralsTab(),
       ]),
     );

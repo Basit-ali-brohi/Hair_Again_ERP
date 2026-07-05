@@ -37,7 +37,11 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
     return ScreenScaffold(
       title: 'APPOINTMENTS',
       subtitle: 'Schedule, confirm and track every clinic session.',
-      actions: [GoldButton(label: 'Add Appointment', icon: Icons.add, onTap: openAddAppointment)],
+      actions: [
+        GhostButton(label: 'Export PDF', icon: Icons.picture_as_pdf_outlined, onTap: () => showPdfPreview(context, title: 'Appointments', build: () => buildAppointmentsPdf(appState.appointments))),
+        const SizedBox(width: 10),
+        GoldButton(label: 'Add Appointment', icon: Icons.add, onTap: openAddAppointment),
+      ],
       child: LayoutBuilder(builder: (ctx, c) {
         return ScrollArea(builder: (sc) => SingleChildScrollView(
           controller: sc,
@@ -226,8 +230,10 @@ class AppointmentsScreenState extends State<AppointmentsScreen> {
               const SizedBox(height: 2),
               Row(children: [Icon(Icons.medical_information_outlined, size: 13, color: p.gold), const SizedBox(width: 5), Text(a.surgeon, style: p.body(11.5, color: p.textMuted))]),
             ])),
-            if (a.status != ApptStatus.confirmed) _act(p, Icons.check, p.success, 'Confirm', () => appState.setApptStatus(a, ApptStatus.confirmed)),
-            if (a.status != ApptStatus.cancelled) _act(p, Icons.close, p.danger, 'Cancel', () => appState.setApptStatus(a, ApptStatus.cancelled)),
+            if (a.status == ApptStatus.pending) _act(p, Icons.check, p.success, 'Confirm', () => appState.setApptStatus(a, ApptStatus.confirmed)),
+            if (a.status == ApptStatus.confirmed) _act(p, Icons.login, p.info, 'Check In', () => appState.setApptStatus(a, ApptStatus.checkedIn)),
+            if (a.status == ApptStatus.checkedIn) _act(p, Icons.logout, p.gold, 'Check Out', () => appState.setApptStatus(a, ApptStatus.completed)),
+            if (a.status != ApptStatus.cancelled && a.status != ApptStatus.completed) _act(p, Icons.close, p.danger, 'Cancel', () => appState.setApptStatus(a, ApptStatus.cancelled)),
             _act(p, Icons.delete_outline, p.textMuted, 'Delete', () async { final ok = await confirm(context, 'Delete appointment?', 'Remove ${a.patientName}\'s slot.'); if (ok) appState.deleteAppointment(a); }),
           ]),
         ),

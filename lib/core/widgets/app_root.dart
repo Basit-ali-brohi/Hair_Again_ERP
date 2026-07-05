@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../theme/app_scope.dart';
 import 'shell.dart';
 import '../../modules/auth/views/login_screen.dart';
+import '../../modules/auth/views/splash_screen.dart';
 
 class HairAgainApp extends StatelessWidget {
   const HairAgainApp({super.key});
@@ -33,7 +34,7 @@ class _Root extends StatelessWidget {
           textStyle: p.body(12, color: p.text),
         ),
       ),
-      home: state.currentUser == null ? const LoginScreen() : const Shell(),
+      home: !state.splashDone ? const SplashScreen() : state.currentUser == null ? const LoginScreen() : const Shell(),
     );
   }
 }

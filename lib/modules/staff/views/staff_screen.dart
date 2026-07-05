@@ -14,7 +14,7 @@ class StaffScreen extends StatefulWidget {
 enum _StaffSort { nameAz, nameZa, role }
 
 class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 3, vsync: this);
+  late final TabController _tab = TabController(length: 8, vsync: this);
   String _search = '';
   StaffRole? _filter;
   _StaffSort _sort = _StaffSort.nameAz;
@@ -66,13 +66,22 @@ class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStat
             unselectedLabelStyle: p.body(12.5),
             labelColor: p.gold, unselectedLabelColor: p.textMuted,
             tabAlignment: TabAlignment.start,
-            tabs: const [Tab(text: 'Directory'), Tab(text: 'Performance'), Tab(text: 'Commission')],
+            tabs: const [
+              Tab(text: 'Directory'),
+              Tab(text: 'Performance'),
+              Tab(text: 'Commission'),
+              Tab(text: 'Documents'),
+              Tab(text: 'Contracts'),
+              Tab(text: 'Incentives'),
+              Tab(text: 'Warnings'),
+              Tab(text: 'Exit Mgmt'),
+            ],
           ),
         ),
         const SizedBox(width: 10),
         GoldButton(label: 'Add Staff', icon: Icons.person_add_alt_1, onTap: () => _showForm()),
       ],
-      child: TabBarView(controller: _tab, children: [
+      child: EagerTabBarView(controller: _tab, children: [
         // ── Tab 1: Directory ─────────────────────────────────────────────────
         LayoutBuilder(builder: (ctx, c) => ScrollArea(builder: (sc) => SingleChildScrollView(
           controller: sc,
@@ -122,6 +131,16 @@ class _StaffScreenState extends State<StaffScreen> with SingleTickerProviderStat
         _PerformanceTab(roleColor: _roleColor),
         // ── Tab 3: Commission ────────────────────────────────────────────────
         _CommissionTab(roleColor: _roleColor),
+        // ── Tab 4: Documents ─────────────────────────────────────────────────
+        _DocumentsTab(roleColor: _roleColor),
+        // ── Tab 5: Contracts ─────────────────────────────────────────────────
+        _ContractsTab(roleColor: _roleColor),
+        // ── Tab 6: Incentives ────────────────────────────────────────────────
+        _IncentivesTab(roleColor: _roleColor),
+        // ── Tab 7: Warnings ──────────────────────────────────────────────────
+        _WarningsTab(roleColor: _roleColor),
+        // ── Tab 8: Exit Mgmt ─────────────────────────────────────────────────
+        _ExitMgmtTab(roleColor: _roleColor),
       ]),
     );
   }
@@ -403,6 +422,672 @@ class _CommissionTabState extends State<_CommissionTab> {
   }
 }
 
+// ─── Documents Tab ────────────────────────────────────────────────────────────
+class _DocumentsTab extends StatefulWidget {
+  final Color Function(AppPalette, StaffRole) roleColor;
+  const _DocumentsTab({required this.roleColor});
+  @override State<_DocumentsTab> createState() => _DocumentsTabState();
+}
+
+class _DocumentsTabState extends State<_DocumentsTab> {
+  void _showAddDialog() {
+    final p = appState.palette;
+    Staff? selectedStaff = appState.staff.isNotEmpty ? appState.staff.first : null;
+    String docType = 'CNIC';
+    final titleC = TextEditingController();
+    final dateC = TextEditingController(text: prettyShort(DateTime.now()));
+    final notesC = TextEditingController();
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: p.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+      child: Container(width: 500, padding: const EdgeInsets.all(26), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.upload_file_outlined, color: p.gold)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ADD DOCUMENT', style: p.display(22)), Text('Attach a staff document', style: p.body(12.5, color: p.textMuted))])),
+          IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: p.textMuted)),
+        ]),
+        const SizedBox(height: 18),
+        Dropdown2<Staff>(
+          label: 'Staff Member',
+          value: selectedStaff,
+          items: appState.staff.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+          onChanged: (v) => ss(() => selectedStaff = v),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: Dropdown2<String>(
+            label: 'Document Type',
+            value: docType,
+            items: ['CNIC', 'Degree', 'Contract', 'Medical', 'Other'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+            onChanged: (v) => ss(() => docType = v ?? 'CNIC'),
+          )),
+          const SizedBox(width: 14),
+          Expanded(child: FormField2(label: 'Upload Date', controller: dateC, hint: 'e.g. 3 Jul')),
+        ]),
+        const SizedBox(height: 14),
+        FormField2(label: 'Title', controller: titleC, hint: 'e.g. National ID Card'),
+        const SizedBox(height: 14),
+        FormField2(label: 'Notes (optional)', controller: notesC, hint: 'Any additional notes'),
+        const SizedBox(height: 22),
+        Row(children: [const Spacer(), GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)), const SizedBox(width: 12), GoldButton(label: 'Add Document', icon: Icons.check, onTap: () {
+          if (selectedStaff == null || titleC.text.trim().isEmpty) { toast(ctx, 'Please fill in required fields'); return; }
+          selectedStaff!.documents.add(StaffDocument(id: 'DOC-${selectedStaff!.documents.length + 1}', title: titleC.text.trim(), docType: docType, uploadDate: dateC.text.trim(), notes: notesC.text.trim().isEmpty ? null : notesC.text.trim()));
+          appState.touch();
+          Navigator.pop(ctx);
+          setState(() {});
+          toast(context, 'Document added');
+        })],
+        ),
+      ])),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final rows = <({Staff staff, StaffDocument doc})>[];
+    for (final s in appState.staff) {
+      for (final d in s.documents) rows.add((staff: s, doc: d));
+    }
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.fromLTRB(0, 16, 12, 28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('STAFF DOCUMENTS', style: p.display(20)),
+            Text('${rows.length} document${rows.length == 1 ? '' : 's'} on file', style: p.body(12.5, color: p.textMuted)),
+          ])),
+          GoldButton(label: 'Add Document', icon: Icons.upload_file_outlined, onTap: _showAddDialog),
+        ]),
+        const SizedBox(height: 18),
+        Panel(child: rows.isEmpty
+            ? Padding(padding: const EdgeInsets.all(32), child: Center(child: Text('No documents uploaded yet.', style: p.body(13, color: p.textMuted))))
+            : FullWidthDataTable(child: DataTable(
+                headingRowHeight: 36, dataRowMinHeight: 48, dataRowMaxHeight: 48,
+                headingTextStyle: p.body(11, color: p.textMuted, weight: FontWeight.w700),
+                dataTextStyle: p.body(12.5),
+                columns: const [
+                  DataColumn(label: Text('EMPLOYEE')),
+                  DataColumn(label: Text('DOC TYPE')),
+                  DataColumn(label: Text('TITLE')),
+                  DataColumn(label: Text('DATE')),
+                  DataColumn(label: Text('NOTES')),
+                  DataColumn(label: Text('ACTIONS')),
+                ],
+                rows: rows.map((r) => DataRow(cells: [
+                  DataCell(Row(children: [
+                    Container(width: 32, height: 32, alignment: Alignment.center, decoration: BoxDecoration(color: widget.roleColor(p, r.staff.role).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(6)), child: Text(r.staff.initials, style: p.body(11, color: widget.roleColor(p, r.staff.role), weight: FontWeight.w700))),
+                    const SizedBox(width: 8),
+                    Text(r.staff.name, style: p.body(13, weight: FontWeight.w600)),
+                  ])),
+                  DataCell(StatusChip(label: r.doc.docType, color: p.info)),
+                  DataCell(Text(r.doc.title)),
+                  DataCell(Text(r.doc.uploadDate)),
+                  DataCell(Text(r.doc.notes ?? '—', style: p.body(12, color: p.textMuted))),
+                  DataCell(Tooltip(message: 'Delete', child: GestureDetector(onTap: () async {
+                    final ok = await confirm(context, 'Delete document?', 'Remove "${r.doc.title}" from ${r.staff.name}.');
+                    if (ok) { r.staff.documents.remove(r.doc); appState.touch(); setState(() {}); }
+                  }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.delete_outline, size: 18, color: p.danger))))),
+                ])).toList(),
+              )),
+        ),
+      ]),
+    ));
+  }
+}
+
+// ─── Contracts Tab ────────────────────────────────────────────────────────────
+class _ContractsTab extends StatefulWidget {
+  final Color Function(AppPalette, StaffRole) roleColor;
+  const _ContractsTab({required this.roleColor});
+  @override State<_ContractsTab> createState() => _ContractsTabState();
+}
+
+class _ContractsTabState extends State<_ContractsTab> {
+  void _showAddDialog() {
+    final p = appState.palette;
+    Staff? selectedStaff = appState.staff.isNotEmpty ? appState.staff.first : null;
+    String contractType = 'Full-Time';
+    final startC = TextEditingController(text: prettyShort(DateTime.now()));
+    final endC = TextEditingController();
+    final salaryC = TextEditingController();
+    final notesC = TextEditingController();
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: p.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+      child: Container(width: 520, padding: const EdgeInsets.all(26), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.description_outlined, color: p.gold)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ADD CONTRACT', style: p.display(22)), Text('Define employment contract terms', style: p.body(12.5, color: p.textMuted))])),
+          IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: p.textMuted)),
+        ]),
+        const SizedBox(height: 18),
+        Dropdown2<Staff>(
+          label: 'Staff Member',
+          value: selectedStaff,
+          items: appState.staff.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+          onChanged: (v) => ss(() => selectedStaff = v),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: Dropdown2<String>(
+            label: 'Contract Type',
+            value: contractType,
+            items: ['Full-Time', 'Part-Time', 'Contract', 'Internship'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+            onChanged: (v) => ss(() => contractType = v ?? 'Full-Time'),
+          )),
+          const SizedBox(width: 14),
+          Expanded(child: FormField2(label: 'Monthly Salary (PKR)', controller: salaryC, hint: 'e.g. 50000', keyboard: TextInputType.number)),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: FormField2(label: 'Start Date', controller: startC, hint: 'e.g. 1 Jan 2026')),
+          const SizedBox(width: 14),
+          Expanded(child: FormField2(label: 'End Date', controller: endC, hint: 'e.g. 31 Dec 2026')),
+        ]),
+        const SizedBox(height: 14),
+        FormField2(label: 'Notes (optional)', controller: notesC, hint: 'Additional contract notes'),
+        const SizedBox(height: 22),
+        Row(children: [const Spacer(), GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)), const SizedBox(width: 12), GoldButton(label: 'Add Contract', icon: Icons.check, onTap: () {
+          if (selectedStaff == null || salaryC.text.trim().isEmpty || endC.text.trim().isEmpty) { toast(ctx, 'Please fill in all required fields'); return; }
+          final salary = double.tryParse(salaryC.text.trim());
+          if (salary == null) { toast(ctx, 'Invalid salary amount'); return; }
+          selectedStaff!.contracts.add(StaffContract(id: 'CON-${selectedStaff!.contracts.length + 1}', type: contractType, startDate: startC.text.trim(), endDate: endC.text.trim(), salary: salary, notes: notesC.text.trim().isEmpty ? null : notesC.text.trim()));
+          appState.touch();
+          Navigator.pop(ctx);
+          setState(() {});
+          toast(context, 'Contract added');
+        })],
+        ),
+      ])),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final rows = <({Staff staff, StaffContract contract})>[];
+    for (final s in appState.staff) {
+      for (final c in s.contracts) rows.add((staff: s, contract: c));
+    }
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.fromLTRB(0, 16, 12, 28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('STAFF CONTRACTS', style: p.display(20)),
+            Text('${rows.length} contract${rows.length == 1 ? '' : 's'} on record', style: p.body(12.5, color: p.textMuted)),
+          ])),
+          GoldButton(label: 'Add Contract', icon: Icons.description_outlined, onTap: _showAddDialog),
+        ]),
+        const SizedBox(height: 18),
+        Panel(child: rows.isEmpty
+            ? Padding(padding: const EdgeInsets.all(32), child: Center(child: Text('No contracts on record.', style: p.body(13, color: p.textMuted))))
+            : FullWidthDataTable(child: DataTable(
+                headingRowHeight: 36, dataRowMinHeight: 48, dataRowMaxHeight: 48,
+                headingTextStyle: p.body(11, color: p.textMuted, weight: FontWeight.w700),
+                dataTextStyle: p.body(12.5),
+                columns: const [
+                  DataColumn(label: Text('EMPLOYEE')),
+                  DataColumn(label: Text('TYPE')),
+                  DataColumn(label: Text('START')),
+                  DataColumn(label: Text('END')),
+                  DataColumn(label: Text('SALARY'), numeric: true),
+                  DataColumn(label: Text('STATUS')),
+                  DataColumn(label: Text('ACTIONS')),
+                ],
+                rows: rows.map((r) => DataRow(cells: [
+                  DataCell(Row(children: [
+                    Container(width: 32, height: 32, alignment: Alignment.center, decoration: BoxDecoration(color: widget.roleColor(p, r.staff.role).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(6)), child: Text(r.staff.initials, style: p.body(11, color: widget.roleColor(p, r.staff.role), weight: FontWeight.w700))),
+                    const SizedBox(width: 8),
+                    Text(r.staff.name, style: p.body(13, weight: FontWeight.w600)),
+                  ])),
+                  DataCell(Text(r.contract.type)),
+                  DataCell(Text(r.contract.startDate)),
+                  DataCell(Text(r.contract.endDate)),
+                  DataCell(Text(money(r.contract.salary), style: p.body(13, color: p.gold, weight: FontWeight.w600))),
+                  DataCell(StatusChip(label: r.contract.active ? 'Active' : 'Expired', color: r.contract.active ? p.success : p.danger)),
+                  DataCell(Row(children: [
+                    Tooltip(message: r.contract.active ? 'Mark Expired' : 'Mark Active', child: GestureDetector(onTap: () { r.contract.active = !r.contract.active; appState.touch(); setState(() {}); }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(r.contract.active ? Icons.toggle_on : Icons.toggle_off_outlined, size: 18, color: r.contract.active ? p.success : p.textMuted)))),
+                    const SizedBox(width: 10),
+                    Tooltip(message: 'Delete', child: GestureDetector(onTap: () async {
+                      final ok = await confirm(context, 'Delete contract?', 'Remove this contract for ${r.staff.name}.');
+                      if (ok) { r.staff.contracts.remove(r.contract); appState.touch(); setState(() {}); }
+                    }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.delete_outline, size: 18, color: p.danger)))),
+                  ])),
+                ])).toList(),
+              )),
+        ),
+      ]),
+    ));
+  }
+}
+
+// ─── Incentives Tab ───────────────────────────────────────────────────────────
+class _IncentivesTab extends StatefulWidget {
+  final Color Function(AppPalette, StaffRole) roleColor;
+  const _IncentivesTab({required this.roleColor});
+  @override State<_IncentivesTab> createState() => _IncentivesTabState();
+}
+
+class _IncentivesTabState extends State<_IncentivesTab> {
+  void _showAddDialog() {
+    final p = appState.palette;
+    Staff? selectedStaff = appState.staff.isNotEmpty ? appState.staff.first : null;
+    final monthC = TextEditingController(text: 'Jul 2026');
+    final reasonC = TextEditingController();
+    final amountC = TextEditingController();
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: p.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+      child: Container(width: 500, padding: const EdgeInsets.all(26), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.stars_outlined, color: p.gold)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ADD INCENTIVE', style: p.display(22)), Text('Record a staff incentive or bonus', style: p.body(12.5, color: p.textMuted))])),
+          IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: p.textMuted)),
+        ]),
+        const SizedBox(height: 18),
+        Dropdown2<Staff>(
+          label: 'Staff Member',
+          value: selectedStaff,
+          items: appState.staff.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+          onChanged: (v) => ss(() => selectedStaff = v),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: FormField2(label: 'Month', controller: monthC, hint: 'e.g. Jul 2026')),
+          const SizedBox(width: 14),
+          Expanded(child: FormField2(label: 'Amount (PKR)', controller: amountC, hint: 'e.g. 5000', keyboard: TextInputType.number)),
+        ]),
+        const SizedBox(height: 14),
+        FormField2(label: 'Reason', controller: reasonC, hint: 'e.g. Outstanding performance'),
+        const SizedBox(height: 22),
+        Row(children: [const Spacer(), GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)), const SizedBox(width: 12), GoldButton(label: 'Add Incentive', icon: Icons.check, onTap: () {
+          if (selectedStaff == null || reasonC.text.trim().isEmpty || amountC.text.trim().isEmpty) { toast(ctx, 'Please fill in all required fields'); return; }
+          final amount = double.tryParse(amountC.text.trim());
+          if (amount == null) { toast(ctx, 'Invalid amount'); return; }
+          selectedStaff!.incentives.add(StaffIncentive(id: 'INC-${selectedStaff!.incentives.length + 1}', month: monthC.text.trim(), reason: reasonC.text.trim(), amount: amount));
+          appState.touch();
+          Navigator.pop(ctx);
+          setState(() {});
+          toast(context, 'Incentive added');
+        })],
+        ),
+      ])),
+    )));
+  }
+
+  String _nextStatus(String current) => switch (current) {
+    'Pending' => 'Approved',
+    'Approved' => 'Paid',
+    _ => 'Pending',
+  };
+
+  Color _statusColor(AppPalette p, String status) => switch (status) {
+    'Approved' => p.info,
+    'Paid' => p.success,
+    _ => p.warning,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final rows = <({Staff staff, StaffIncentive incentive})>[];
+    for (final s in appState.staff) {
+      for (final i in s.incentives) rows.add((staff: s, incentive: i));
+    }
+    final totalAmount = rows.fold(0.0, (sum, r) => sum + r.incentive.amount);
+    final paidCount = rows.where((r) => r.incentive.status == 'Paid').length;
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.fromLTRB(0, 16, 12, 28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        MetricRow([
+          MetricCard(title: 'Total Incentives', value: '${rows.length}', delta: 'All time', icon: Icons.stars_outlined),
+          MetricCard(title: 'Total Amount', value: moneyShort(totalAmount), delta: 'All incentives', icon: Icons.payments_outlined),
+          MetricCard(title: 'Paid Out', value: '$paidCount', delta: 'of ${rows.length} incentives', icon: Icons.check_circle_outline),
+          MetricCard(title: 'Pending Approval', value: '${rows.where((r) => r.incentive.status == 'Pending').length}', delta: 'Awaiting review', icon: Icons.pending_outlined),
+        ]),
+        const SizedBox(height: 18),
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('INCENTIVES & BONUSES', style: p.display(20)),
+            Text('Tap status to cycle: Pending → Approved → Paid', style: p.body(12.5, color: p.textMuted)),
+          ])),
+          GoldButton(label: 'Add Incentive', icon: Icons.stars_outlined, onTap: _showAddDialog),
+        ]),
+        const SizedBox(height: 18),
+        Panel(child: rows.isEmpty
+            ? Padding(padding: const EdgeInsets.all(32), child: Center(child: Text('No incentives recorded yet.', style: p.body(13, color: p.textMuted))))
+            : FullWidthDataTable(child: DataTable(
+                headingRowHeight: 36, dataRowMinHeight: 48, dataRowMaxHeight: 48,
+                headingTextStyle: p.body(11, color: p.textMuted, weight: FontWeight.w700),
+                dataTextStyle: p.body(12.5),
+                columns: const [
+                  DataColumn(label: Text('EMPLOYEE')),
+                  DataColumn(label: Text('MONTH')),
+                  DataColumn(label: Text('REASON')),
+                  DataColumn(label: Text('AMOUNT'), numeric: true),
+                  DataColumn(label: Text('STATUS')),
+                  DataColumn(label: Text('ACTIONS')),
+                ],
+                rows: rows.map((r) => DataRow(cells: [
+                  DataCell(Row(children: [
+                    Container(width: 32, height: 32, alignment: Alignment.center, decoration: BoxDecoration(color: widget.roleColor(p, r.staff.role).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(6)), child: Text(r.staff.initials, style: p.body(11, color: widget.roleColor(p, r.staff.role), weight: FontWeight.w700))),
+                    const SizedBox(width: 8),
+                    Text(r.staff.name, style: p.body(13, weight: FontWeight.w600)),
+                  ])),
+                  DataCell(Text(r.incentive.month)),
+                  DataCell(Text(r.incentive.reason)),
+                  DataCell(Text(money(r.incentive.amount), style: p.body(13, color: p.gold, weight: FontWeight.w600))),
+                  DataCell(Tooltip(message: 'Click to advance status', child: GestureDetector(onTap: () { r.incentive.status = _nextStatus(r.incentive.status); appState.touch(); setState(() {}); }, child: MouseRegion(cursor: SystemMouseCursors.click, child: StatusChip(label: r.incentive.status, color: _statusColor(p, r.incentive.status)))))),
+                  DataCell(Tooltip(message: 'Delete', child: GestureDetector(onTap: () async {
+                    final ok = await confirm(context, 'Delete incentive?', 'Remove this incentive for ${r.staff.name}.');
+                    if (ok) { r.staff.incentives.remove(r.incentive); appState.touch(); setState(() {}); }
+                  }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.delete_outline, size: 18, color: p.danger))))),
+                ])).toList(),
+              )),
+        ),
+      ]),
+    ));
+  }
+}
+
+// ─── Warnings Tab ─────────────────────────────────────────────────────────────
+class _WarningsTab extends StatefulWidget {
+  final Color Function(AppPalette, StaffRole) roleColor;
+  const _WarningsTab({required this.roleColor});
+  @override State<_WarningsTab> createState() => _WarningsTabState();
+}
+
+class _WarningsTabState extends State<_WarningsTab> {
+  void _showAddDialog() {
+    final p = appState.palette;
+    Staff? selectedStaff = appState.staff.isNotEmpty ? appState.staff.first : null;
+    String severity = 'Minor';
+    final reasonC = TextEditingController();
+    final issuedByC = TextEditingController();
+    final dateC = TextEditingController(text: prettyShort(DateTime.now()));
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: p.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+      child: Container(width: 500, padding: const EdgeInsets.all(26), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.warning_amber_outlined, color: p.danger)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ISSUE WARNING', style: p.display(22)), Text('Record a disciplinary warning', style: p.body(12.5, color: p.textMuted))])),
+          IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: p.textMuted)),
+        ]),
+        const SizedBox(height: 18),
+        Dropdown2<Staff>(
+          label: 'Staff Member',
+          value: selectedStaff,
+          items: appState.staff.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+          onChanged: (v) => ss(() => selectedStaff = v),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: Dropdown2<String>(
+            label: 'Severity',
+            value: severity,
+            items: ['Minor', 'Major', 'Final'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+            onChanged: (v) => ss(() => severity = v ?? 'Minor'),
+          )),
+          const SizedBox(width: 14),
+          Expanded(child: FormField2(label: 'Date', controller: dateC, hint: 'e.g. 3 Jul')),
+        ]),
+        const SizedBox(height: 14),
+        FormField2(label: 'Issued By', controller: issuedByC, hint: 'e.g. Dr. Rehman / Manager'),
+        const SizedBox(height: 14),
+        FormField2(label: 'Reason', controller: reasonC, hint: 'Describe the disciplinary issue'),
+        const SizedBox(height: 22),
+        Row(children: [const Spacer(), GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)), const SizedBox(width: 12), GoldButton(label: 'Issue Warning', icon: Icons.check, onTap: () {
+          if (selectedStaff == null || reasonC.text.trim().isEmpty || issuedByC.text.trim().isEmpty) { toast(ctx, 'Please fill in all required fields'); return; }
+          selectedStaff!.warnings.add(StaffWarning(id: 'WARN-${selectedStaff!.warnings.length + 1}', date: dateC.text.trim(), reason: reasonC.text.trim(), severity: severity, issuedBy: issuedByC.text.trim()));
+          appState.touch();
+          Navigator.pop(ctx);
+          setState(() {});
+          toast(context, 'Warning issued');
+        })],
+        ),
+      ])),
+    )));
+  }
+
+  Color _severityColor(AppPalette p, String severity) => switch (severity) {
+    'Major' => p.warning,
+    'Final' => p.danger,
+    _ => p.info,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final rows = <({Staff staff, StaffWarning warning})>[];
+    for (final s in appState.staff) {
+      for (final w in s.warnings) rows.add((staff: s, warning: w));
+    }
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.fromLTRB(0, 16, 12, 28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('DISCIPLINARY WARNINGS', style: p.display(20)),
+            Text('${rows.length} warning${rows.length == 1 ? '' : 's'} on record', style: p.body(12.5, color: p.textMuted)),
+          ])),
+          GoldButton(label: 'Issue Warning', icon: Icons.warning_amber_outlined, onTap: _showAddDialog),
+        ]),
+        const SizedBox(height: 18),
+        Panel(child: rows.isEmpty
+            ? Padding(padding: const EdgeInsets.all(32), child: Center(child: Text('No warnings on record.', style: p.body(13, color: p.textMuted))))
+            : FullWidthDataTable(child: DataTable(
+                headingRowHeight: 36, dataRowMinHeight: 48, dataRowMaxHeight: 52,
+                headingTextStyle: p.body(11, color: p.textMuted, weight: FontWeight.w700),
+                dataTextStyle: p.body(12.5),
+                columns: const [
+                  DataColumn(label: Text('EMPLOYEE')),
+                  DataColumn(label: Text('DATE')),
+                  DataColumn(label: Text('SEVERITY')),
+                  DataColumn(label: Text('REASON')),
+                  DataColumn(label: Text('ISSUED BY')),
+                  DataColumn(label: Text('ACTIONS')),
+                ],
+                rows: rows.map((r) => DataRow(cells: [
+                  DataCell(Row(children: [
+                    Container(width: 32, height: 32, alignment: Alignment.center, decoration: BoxDecoration(color: widget.roleColor(p, r.staff.role).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(6)), child: Text(r.staff.initials, style: p.body(11, color: widget.roleColor(p, r.staff.role), weight: FontWeight.w700))),
+                    const SizedBox(width: 8),
+                    Text(r.staff.name, style: p.body(13, weight: FontWeight.w600)),
+                  ])),
+                  DataCell(Text(r.warning.date)),
+                  DataCell(StatusChip(label: r.warning.severity, color: _severityColor(p, r.warning.severity))),
+                  DataCell(Expanded(child: Text(r.warning.reason, maxLines: 2, overflow: TextOverflow.ellipsis))),
+                  DataCell(Text(r.warning.issuedBy, style: p.body(12, color: p.textMuted))),
+                  DataCell(Tooltip(message: 'Delete', child: GestureDetector(onTap: () async {
+                    final ok = await confirm(context, 'Delete warning?', 'Remove this warning for ${r.staff.name}.');
+                    if (ok) { r.staff.warnings.remove(r.warning); appState.touch(); setState(() {}); }
+                  }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.delete_outline, size: 18, color: p.danger))))),
+                ])).toList(),
+              )),
+        ),
+      ]),
+    ));
+  }
+}
+
+// ─── Exit Management Tab ──────────────────────────────────────────────────────
+class _ExitMgmtTab extends StatefulWidget {
+  final Color Function(AppPalette, StaffRole) roleColor;
+  const _ExitMgmtTab({required this.roleColor});
+  @override State<_ExitMgmtTab> createState() => _ExitMgmtTabState();
+}
+
+class _ExitMgmtTabState extends State<_ExitMgmtTab> {
+  void _showInitiateDialog() {
+    final p = appState.palette;
+    final eligibleStaff = appState.staff.where((s) => s.exitRecord == null).toList();
+    if (eligibleStaff.isEmpty) { toast(context, 'All staff already have exit records'); return; }
+    Staff? selectedStaff = eligibleStaff.first;
+    String exitType = 'Resignation';
+    final lastDayC = TextEditingController(text: prettyShort(DateTime.now()));
+    final reasonC = TextEditingController();
+    final notesC = TextEditingController();
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: p.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.border)),
+      child: Container(width: 520, padding: const EdgeInsets.all(26), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.exit_to_app_outlined, color: p.warning)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('INITIATE EXIT', style: p.display(22)), Text('Begin the offboarding process', style: p.body(12.5, color: p.textMuted))])),
+          IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: p.textMuted)),
+        ]),
+        const SizedBox(height: 18),
+        Dropdown2<Staff>(
+          label: 'Staff Member',
+          value: selectedStaff,
+          items: eligibleStaff.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+          onChanged: (v) => ss(() => selectedStaff = v),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: Dropdown2<String>(
+            label: 'Exit Type',
+            value: exitType,
+            items: ['Resignation', 'Termination', 'Retirement'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+            onChanged: (v) => ss(() => exitType = v ?? 'Resignation'),
+          )),
+          const SizedBox(width: 14),
+          Expanded(child: FormField2(label: 'Last Working Day', controller: lastDayC, hint: 'e.g. 31 Jul')),
+        ]),
+        const SizedBox(height: 14),
+        FormField2(label: 'Reason', controller: reasonC, hint: 'Reason for exit'),
+        const SizedBox(height: 14),
+        FormField2(label: 'Notes (optional)', controller: notesC, hint: 'Handover notes, etc.'),
+        const SizedBox(height: 22),
+        Row(children: [const Spacer(), GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)), const SizedBox(width: 12), GoldButton(label: 'Initiate Exit', icon: Icons.check, onTap: () {
+          if (selectedStaff == null || reasonC.text.trim().isEmpty || lastDayC.text.trim().isEmpty) { toast(ctx, 'Please fill in all required fields'); return; }
+          selectedStaff!.exitRecord = StaffExitRecord(exitType: exitType, lastWorkingDay: lastDayC.text.trim(), reason: reasonC.text.trim(), notes: notesC.text.trim().isEmpty ? null : notesC.text.trim());
+          appState.touch();
+          Navigator.pop(ctx);
+          setState(() {});
+          toast(context, 'Exit initiated for ${selectedStaff!.name}');
+        })],
+        ),
+      ])),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final exiting = appState.staff.where((s) => s.exitRecord != null).toList();
+    final thisMonth = prettyShort(DateTime.now()).split(' ').last;
+    final thisMonthExits = exiting.where((s) => s.exitRecord!.lastWorkingDay.contains(thisMonth)).length;
+    final pendingHandover = exiting.where((s) => s.exitRecord!.handoverStatus == 'Pending').length;
+    final settled = exiting.where((s) => s.exitRecord!.settled).length;
+
+    return ScrollArea(builder: (sc) => SingleChildScrollView(
+      controller: sc,
+      padding: const EdgeInsets.fromLTRB(0, 16, 12, 28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        MetricRow([
+          MetricCard(title: 'Total Exits', value: '${exiting.length}', delta: 'All time', icon: Icons.exit_to_app_outlined),
+          MetricCard(title: 'This Month', value: '$thisMonthExits', delta: 'Recent departures', icon: Icons.calendar_today_outlined),
+          MetricCard(title: 'Pending Handover', value: '$pendingHandover', delta: 'Needs completion', icon: Icons.pending_outlined),
+          MetricCard(title: 'Final Settlements', value: '$settled', delta: 'of ${exiting.length} exits', icon: Icons.check_circle_outline),
+        ]),
+        const SizedBox(height: 18),
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('EXIT MANAGEMENT', style: p.display(20)),
+            Text('Track offboarding, handovers and final settlements', style: p.body(12.5, color: p.textMuted)),
+          ])),
+          GoldButton(label: 'Initiate Exit', icon: Icons.exit_to_app_outlined, onTap: _showInitiateDialog),
+        ]),
+        const SizedBox(height: 18),
+        if (exiting.isEmpty)
+          Panel(child: Padding(padding: const EdgeInsets.all(32), child: Center(child: Text('No exits initiated.', style: p.body(13, color: p.textMuted)))))
+        else
+          ...exiting.map((s) {
+            final ex = s.exitRecord!;
+            final rc = widget.roleColor(p, s.role);
+            return Padding(padding: const EdgeInsets.only(bottom: 14), child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(width: 48, height: 48, alignment: Alignment.center, decoration: BoxDecoration(color: rc.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)), child: Text(s.initials, style: p.body(16, color: rc, weight: FontWeight.w700))),
+                const SizedBox(width: 14),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(s.name, style: p.body(15, weight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Wrap(spacing: 8, runSpacing: 4, children: [
+                    StatusChip(label: s.role.label, color: rc),
+                    StatusChip(label: ex.exitType, color: ex.exitType == 'Termination' ? p.danger : p.warning),
+                  ]),
+                ])),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  StatusChip(label: ex.settled ? 'Settled' : 'Unsettled', color: ex.settled ? p.success : p.danger),
+                  const SizedBox(height: 6),
+                  StatusChip(label: 'Handover: ${ex.handoverStatus}', color: ex.handoverStatus == 'Complete' ? p.success : p.warning),
+                ]),
+              ]),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+                child: Column(children: [
+                  Row(children: [
+                    Icon(Icons.calendar_today_outlined, size: 14, color: p.textMuted), const SizedBox(width: 8),
+                    Text('Last Working Day: ', style: p.body(12, color: p.textMuted)),
+                    Text(ex.lastWorkingDay, style: p.body(12, weight: FontWeight.w600)),
+                  ]),
+                  if (ex.reason.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Icon(Icons.info_outline, size: 14, color: p.textMuted), const SizedBox(width: 8),
+                      Expanded(child: Text(ex.reason, style: p.body(12, color: p.textMuted))),
+                    ]),
+                  ],
+                  if (ex.notes != null) ...[
+                    const SizedBox(height: 8),
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Icon(Icons.note_outlined, size: 14, color: p.textMuted), const SizedBox(width: 8),
+                      Expanded(child: Text(ex.notes!, style: p.body(12, color: p.textMuted))),
+                    ]),
+                  ],
+                ]),
+              ),
+              const SizedBox(height: 12),
+              Row(children: [
+                GhostButton(label: ex.handoverStatus == 'Complete' ? 'Handover Done' : 'Mark Handover Complete', dense: true, onTap: () {
+                  ex.handoverStatus = ex.handoverStatus == 'Complete' ? 'Pending' : 'Complete';
+                  appState.touch(); setState(() {});
+                }),
+                const SizedBox(width: 10),
+                GoldButton(label: ex.settled ? 'Settlement Done' : 'Mark Settled', dense: true, icon: ex.settled ? Icons.check_circle : Icons.payments_outlined, onTap: () {
+                  ex.settled = !ex.settled;
+                  appState.touch(); setState(() {});
+                  toast(context, ex.settled ? '${s.name} marked as settled' : 'Settlement reverted');
+                }),
+                const Spacer(),
+                Tooltip(message: 'Remove exit record', child: GestureDetector(onTap: () async {
+                  final ok = await confirm(context, 'Remove exit record?', 'This will remove the exit record for ${s.name}.');
+                  if (ok) { s.exitRecord = null; appState.touch(); setState(() {}); }
+                }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.delete_outline, size: 18, color: p.danger)))),
+              ]),
+            ])));
+          }),
+        const SizedBox(height: 8),
+      ]),
+    ));
+  }
+}
+
+// ─── Staff Form Dialog ────────────────────────────────────────────────────────
 class StaffFormDialog extends StatefulWidget {
   final Staff? existing;
   const StaffFormDialog({super.key, this.existing});

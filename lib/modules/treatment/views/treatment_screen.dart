@@ -11,7 +11,7 @@ class TreatmentScreen extends StatefulWidget {
 class _TreatmentScreenState extends State<TreatmentScreen> with SingleTickerProviderStateMixin {
   late final TabController _tab;
   @override
-  void initState() { super.initState(); _tab = TabController(length: 3, vsync: this); }
+  void initState() { super.initState(); _tab = TabController(length: 6, vsync: this); }
   @override
   void dispose() { _tab.dispose(); super.dispose(); }
 
@@ -28,11 +28,11 @@ class _TreatmentScreenState extends State<TreatmentScreen> with SingleTickerProv
             indicatorColor: p.gold, indicatorSize: TabBarIndicatorSize.label,
             labelStyle: p.body(12.5, weight: FontWeight.w600), unselectedLabelStyle: p.body(12.5),
             labelColor: p.gold, unselectedLabelColor: p.textMuted, tabAlignment: TabAlignment.start,
-            tabs: const [Tab(text: 'Treatment Plans'), Tab(text: 'Sessions'), Tab(text: 'Progress Tracker')]),
+            tabs: const [Tab(text: 'Treatment Plans'), Tab(text: 'Sessions'), Tab(text: 'Progress Tracker'), Tab(text: 'Session Notes'), Tab(text: 'Before / After'), Tab(text: 'Follow-up')]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
-        _PlansTab(), _SessionsTab(), _ProgressTab(),
+      child: EagerTabBarView(controller: _tab, children: const [
+        _PlansTab(), _SessionsTab(), _ProgressTab(), _SessionNotesTab(), _BeforeAfterTab(), _FollowUpTab(),
       ]),
     );
   }
@@ -348,4 +348,165 @@ class _ProgressTabState extends State<_ProgressTab> {
       },
     ));
   }
+}
+
+// ── Session Notes ─────────────────────────────────────────────────────────────
+class _SessionNotesTab extends StatelessWidget {
+  const _SessionNotesTab();
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final sessions = appState.treatmentPlans.expand((pl) => pl.sessions).where((s) => s.notes.isNotEmpty || s.outcome.isNotEmpty).toList()
+      ..sort((a, b) => b.scheduledDate.compareTo(a.scheduledDate));
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, padding: const EdgeInsets.only(right: 12, bottom: 28), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (sessions.isEmpty)
+        Center(child: Padding(padding: const EdgeInsets.all(40), child: Column(children: [Icon(Icons.notes_outlined, size: 48, color: p.textMuted), const SizedBox(height: 12), Text('No session notes yet', style: p.body(15, color: p.textMuted))]))),
+      ...sessions.map((s) {
+        final plan = appState.treatmentPlans.firstWhere((pl) => pl.id == s.planId, orElse: () => appState.treatmentPlans.first);
+        return Padding(padding: const EdgeInsets.only(bottom: 14), child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)), child: Text('Session #${s.sessionNumber}', style: p.body(12, color: p.gold, weight: FontWeight.w700))),
+            const SizedBox(width: 10),
+            StatusChip(label: s.status.label, color: switch (s.status) { SessionStatus.completed => p.success, SessionStatus.missed => p.danger, SessionStatus.rescheduled => p.warning, _ => p.info }),
+            const Spacer(),
+            Text(prettyShort(s.scheduledDate), style: p.body(12, color: p.textMuted)),
+          ]),
+          const SizedBox(height: 10),
+          Text(plan.patientName, style: p.body(14, weight: FontWeight.w700)),
+          Text(plan.treatmentName, style: p.body(12, color: p.textMuted)),
+          if (s.notes.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('NOTES', style: p.body(10, weight: FontWeight.w700, spacing: 1.0, color: p.textMuted)),
+            const SizedBox(height: 5),
+            Text(s.notes, style: p.body(13)),
+          ],
+          if (s.outcome.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('OUTCOME', style: p.body(10, weight: FontWeight.w700, spacing: 1.0, color: p.textMuted)),
+            const SizedBox(height: 5),
+            Text(s.outcome, style: p.body(13)),
+          ],
+        ])));
+      }),
+    ])));
+  }
+}
+
+// ── Before / After Comparison ─────────────────────────────────────────────────
+class _BeforeAfterTab extends StatelessWidget {
+  const _BeforeAfterTab();
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final plans = appState.treatmentPlans;
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, padding: const EdgeInsets.only(right: 12, bottom: 28), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      MetricRow([
+        MetricCard(title: 'Total Plans', value: '${plans.length}', delta: '${plans.length} plans', icon: Icons.assignment_outlined),
+        MetricCard(title: 'Completed', value: '${plans.where((p) => p.status == TreatmentPlanStatus.completed).length}', delta: 'completed', icon: Icons.check_circle_outline),
+        MetricCard(title: 'Active', value: '${plans.where((p) => p.status == TreatmentPlanStatus.active).length}', delta: 'in progress', icon: Icons.timelapse_outlined),
+        MetricCard(title: 'Avg Progress', value: plans.isEmpty ? '0%' : '${(plans.map((p) => p.progressPct).reduce((a, b) => a + b) / plans.length * 100).toStringAsFixed(0)}%', delta: 'avg completion', icon: Icons.trending_up_outlined),
+      ]),
+      const SizedBox(height: 18),
+      if (plans.isEmpty)
+        Center(child: Padding(padding: const EdgeInsets.all(40), child: Text('No treatment plans yet.', style: p.body(14, color: p.textMuted)))),
+      ...plans.map((plan) => Padding(padding: const EdgeInsets.only(bottom: 16), child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(plan.patientName, style: p.body(15, weight: FontWeight.w700)),
+            Text(plan.treatmentName, style: p.body(12, color: p.textMuted)),
+          ])),
+          StatusChip(label: plan.status.label, color: switch (plan.status) { TreatmentPlanStatus.active => p.success, TreatmentPlanStatus.completed => p.gold, TreatmentPlanStatus.paused => p.warning, _ => p.danger }),
+        ]),
+        const SizedBox(height: 14),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Column(children: [
+            Container(height: 160, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.photo_camera_outlined, size: 32, color: p.textMuted), const SizedBox(height: 8), Text('BEFORE', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0))])),
+          ])),
+          const SizedBox(width: 14),
+          Expanded(child: Column(children: [
+            Container(height: 160, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.photo_camera_outlined, size: 32, color: p.textMuted), const SizedBox(height: 8), Text('AFTER', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0))])),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: plan.progressPct, minHeight: 8, backgroundColor: p.border, color: p.gold)),
+        const SizedBox(height: 6),
+        Text('${plan.completedSessions}/${plan.totalSessions} sessions — ${(plan.progressPct * 100).toStringAsFixed(0)}% complete', style: p.body(12, color: p.textMuted)),
+      ])))),
+    ])));
+  }
+}
+
+// ── Follow-up Schedule ────────────────────────────────────────────────────────
+class _FollowUpTab extends StatefulWidget {
+  const _FollowUpTab();
+  @override
+  State<_FollowUpTab> createState() => _FollowUpTabState();
+}
+
+class _FollowUpTabState extends State<_FollowUpTab> {
+  final List<_FollowUp> _followUps = [
+    _FollowUp(id: 'FU-1', patientName: 'Ahmed Khan', planName: 'PRP Therapy', dueDate: DateTime.now().add(const Duration(days: 3)), notes: 'Check scalp healing', status: 'Pending'),
+    _FollowUp(id: 'FU-2', patientName: 'Sara Ali', planName: 'Hair Transplant Recovery', dueDate: DateTime.now().add(const Duration(days: 7)), notes: 'Post-op review', status: 'Pending'),
+    _FollowUp(id: 'FU-3', patientName: 'Bilal Hassan', planName: 'Laser Treatment', dueDate: DateTime.now().subtract(const Duration(days: 2)), notes: 'Progress assessment', status: 'Overdue'),
+  ];
+
+  void _showAdd(BuildContext context, AppPalette p) {
+    final patient = TextEditingController(); final plan = TextEditingController(); final notes = TextEditingController();
+    showDialog(context: context, builder: (_) => AlertDialog(backgroundColor: p.surface, title: Text('Add Follow-up', style: p.body(16, weight: FontWeight.w700)), content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
+      FormField2(label: 'Patient Name', controller: patient, hint: 'Patient name'),
+      const SizedBox(height: 12),
+      FormField2(label: 'Treatment Plan', controller: plan, hint: 'Plan name'),
+      const SizedBox(height: 12),
+      FormField2(label: 'Notes', controller: notes, hint: 'Follow-up notes', maxLines: 3),
+    ])), actions: [GhostButton(label: 'Cancel', onTap: () => Navigator.pop(context)), const SizedBox(width: 8), GoldButton(label: 'Add', icon: Icons.add, onTap: () {
+      if (patient.text.isEmpty) return;
+      setState(() => _followUps.add(_FollowUp(id: 'FU-${_followUps.length + 1}', patientName: patient.text.trim(), planName: plan.text.trim().isEmpty ? 'General' : plan.text.trim(), dueDate: DateTime.now().add(const Duration(days: 7)), notes: notes.text.trim(), status: 'Pending')));
+      Navigator.pop(context);
+      toast(context, 'Follow-up scheduled');
+    })],
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final overdue = _followUps.where((f) => f.status == 'Overdue').length;
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, padding: const EdgeInsets.only(right: 12, bottom: 28), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      MetricRow([
+        MetricCard(title: 'Total Follow-ups', value: '${_followUps.length}', delta: '${_followUps.length} scheduled', icon: Icons.event_repeat_outlined),
+        MetricCard(title: 'Due This Week', value: '${_followUps.where((f) => f.dueDate.difference(DateTime.now()).inDays <= 7 && f.status != 'Done').length}', delta: 'this week', icon: Icons.schedule_outlined),
+        MetricCard(title: 'Overdue', value: '$overdue', deltaUp: false, delta: overdue > 0 ? 'Needs attention' : 'None', icon: Icons.warning_amber_outlined),
+        MetricCard(title: 'Completed', value: '${_followUps.where((f) => f.status == 'Done').length}', delta: 'done', icon: Icons.check_circle_outline),
+      ]),
+      const SizedBox(height: 18),
+      Row(children: [
+        Text('FOLLOW-UP SCHEDULE', style: p.display(18, spacing: 1.2)),
+        const Spacer(),
+        GoldButton(label: 'Add Follow-up', icon: Icons.add, onTap: () => _showAdd(context, p)),
+      ]),
+      const SizedBox(height: 14),
+      Panel(padding: EdgeInsets.zero, child: FullWidthDataTable(child: DataTable(columns: const [DataColumn(label: Text('Patient')), DataColumn(label: Text('Plan')), DataColumn(label: Text('Due Date')), DataColumn(label: Text('Notes')), DataColumn(label: Text('Status')), DataColumn(label: Text('Action'))],
+        rows: _followUps.map((f) {
+          final color = f.status == 'Done' ? p.success : f.status == 'Overdue' ? p.danger : p.warning;
+          return DataRow(cells: [
+            DataCell(Text(f.patientName, style: p.body(13, weight: FontWeight.w600))),
+            DataCell(Text(f.planName, style: p.body(13))),
+            DataCell(Text(prettyShort(f.dueDate), style: p.body(13))),
+            DataCell(Text(f.notes.isEmpty ? '—' : f.notes, style: p.body(13, color: p.textMuted))),
+            DataCell(StatusChip(label: f.status, color: color)),
+            DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+              if (f.status != 'Done') GhostButton(label: 'Mark Done', onTap: () => setState(() => f.status = 'Done')),
+              const SizedBox(width: 6),
+              GhostButton(label: 'Delete', onTap: () => setState(() => _followUps.remove(f))),
+            ])),
+          ]);
+        }).toList(),
+      ))),
+    ])));
+  }
+}
+
+class _FollowUp {
+  final String id; String patientName, planName, notes, status; DateTime dueDate;
+  _FollowUp({required this.id, required this.patientName, required this.planName, required this.dueDate, required this.notes, required this.status});
 }

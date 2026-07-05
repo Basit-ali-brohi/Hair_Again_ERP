@@ -11,7 +11,7 @@ class VendorsScreen extends StatefulWidget {
 class _VendorsScreenState extends State<VendorsScreen> with SingleTickerProviderStateMixin {
   late final TabController _tab;
   @override
-  void initState() { super.initState(); _tab = TabController(length: 3, vsync: this); }
+  void initState() { super.initState(); _tab = TabController(length: 6, vsync: this); }
   @override
   void dispose() { _tab.dispose(); super.dispose(); }
 
@@ -20,7 +20,7 @@ class _VendorsScreenState extends State<VendorsScreen> with SingleTickerProvider
     final p = pal(context);
     return ScreenScaffold(
       title: 'VENDORS & PURCHASING',
-      subtitle: 'Vendor directory, purchase orders & goods receiving management',
+      subtitle: 'Vendor directory, purchase orders, requests, goods receiving & payments',
       actions: [
         Container(height: 42,
           decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
@@ -28,11 +28,15 @@ class _VendorsScreenState extends State<VendorsScreen> with SingleTickerProvider
             indicatorColor: p.gold, indicatorSize: TabBarIndicatorSize.label,
             labelStyle: p.body(12.5, weight: FontWeight.w600), unselectedLabelStyle: p.body(12.5),
             labelColor: p.gold, unselectedLabelColor: p.textMuted, tabAlignment: TabAlignment.start,
-            tabs: const [Tab(text: 'Vendors'), Tab(text: 'Purchase Orders'), Tab(text: 'Goods Receiving')]),
+            tabs: const [
+              Tab(text: 'Vendors'), Tab(text: 'Purchase Orders'), Tab(text: 'Goods Receiving'),
+              Tab(text: 'Purchase Requests'), Tab(text: 'Receive Goods'), Tab(text: 'Vendor Payments'),
+            ]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
+      child: EagerTabBarView(controller: _tab, children: const [
         _VendorsTab(), _POTab(), _GRTab(),
+        _PurchaseRequestsTab(), _ReceiveGoodsTab(), _VendorPaymentsTab(),
       ]),
     );
   }
@@ -396,3 +400,465 @@ class _GRTabState extends State<_GRTab> {
         ));
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PURCHASE REQUESTS TAB
+// ══════════════════════════════════════════════════════════════════════════════
+class _PurchaseRequest {
+  final String id, item, requester, reason;
+  final int qty;
+  final String urgency; // Low / Medium / High
+  String status; // Pending / Approved / Rejected / Ordered
+  final String date;
+  _PurchaseRequest({required this.id, required this.date, required this.item, required this.qty, required this.urgency, required this.requester, required this.reason, this.status = 'Pending'});
+}
+
+class _PurchaseRequestsTab extends StatefulWidget {
+  const _PurchaseRequestsTab();
+  @override
+  State<_PurchaseRequestsTab> createState() => _PurchaseRequestsTabState();
+}
+
+class _PurchaseRequestsTabState extends State<_PurchaseRequestsTab> {
+  final _requests = <_PurchaseRequest>[
+    _PurchaseRequest(id: 'PR-001', date: '1 Jul 2026', item: 'PRP Vials (Box of 10)', qty: 5, urgency: 'High', requester: 'Dr. Rashid', reason: 'Running low in Branch 1', status: 'Approved'),
+    _PurchaseRequest(id: 'PR-002', date: '2 Jul 2026', item: 'Surgical Gloves (M)', qty: 20, urgency: 'Medium', requester: 'Nurse Hina', reason: 'Monthly restock', status: 'Pending'),
+    _PurchaseRequest(id: 'PR-003', date: '3 Jul 2026', item: 'Hair Serum Deluxe', qty: 10, urgency: 'Low', requester: 'Reception', reason: 'Client retail demand', status: 'Pending'),
+  ];
+  int _nextId = 4;
+
+  static const _urgencies = ['Low', 'Medium', 'High'];
+  static const _staffList = ['Dr. Rashid', 'Dr. Sara', 'Nurse Hina', 'Reception', 'Manager', 'Admin'];
+
+  Color _urgencyColor(AppPalette p, String u) => switch (u) { 'High' => p.danger, 'Medium' => p.warning, _ => p.success };
+  Color _statusColor(AppPalette p, String s) => switch (s) { 'Approved' => p.success, 'Rejected' => p.danger, 'Ordered' => p.info, _ => p.warning };
+
+  void _newRequest() {
+    final p = appState.palette;
+    final itemCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    String urgency = 'Medium';
+    String requester = _staffList.first;
+    int qty = 1;
+
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(width: 540, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('NEW PURCHASE REQUEST', style: p.display(22, spacing: 1.0)),
+          const SizedBox(height: 20),
+          FormField2(label: 'Item / Product *', controller: itemCtrl, hint: 'e.g. PRP Vials Box of 10'),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: Dropdown2<String>(label: 'Urgency', value: urgency,
+              items: _urgencies.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+              onChanged: (v) => ss(() => urgency = v ?? urgency))),
+            const SizedBox(width: 14),
+            Expanded(child: Dropdown2<String>(label: 'Requested By', value: requester,
+              items: _staffList.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              onChanged: (v) => ss(() => requester = v ?? requester))),
+            const SizedBox(width: 14),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('QTY', style: p.body(11, weight: FontWeight.w700, spacing: 1.0, color: p.textMuted)),
+              const SizedBox(height: 8),
+              Row(children: [
+                QtyButton(Icons.remove, () => ss(() { if (qty > 1) qty--; })),
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('$qty', style: p.display(18))),
+                QtyButton(Icons.add, () => ss(() => qty++)),
+              ]),
+            ]),
+          ]),
+          const SizedBox(height: 14),
+          FormField2(label: 'Reason', controller: reasonCtrl, hint: 'Why is this needed?', maxLines: 2),
+          const SizedBox(height: 24),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
+            const SizedBox(width: 12),
+            GoldButton(label: 'Submit Request', onTap: () {
+              if (itemCtrl.text.isEmpty) return;
+              setState(() {
+                _requests.insert(0, _PurchaseRequest(
+                  id: 'PR-${_nextId.toString().padLeft(3, '0')}',
+                  date: prettyShort(DateTime.now()),
+                  item: itemCtrl.text, qty: qty,
+                  urgency: urgency, requester: requester,
+                  reason: reasonCtrl.text,
+                ));
+                _nextId++;
+              });
+              Navigator.pop(ctx);
+              toast(context, 'Purchase request submitted');
+            }),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return Column(children: [
+      Row(children: [const Spacer(), GoldButton(label: 'New Request', icon: Icons.add, onTap: _newRequest)]),
+      const SizedBox(height: 12),
+      Expanded(child: _requests.isEmpty
+        ? Center(child: Text('No purchase requests.', style: p.body(13, color: p.textMuted)))
+        : Panel(padding: EdgeInsets.zero, child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc,
+            child: FullWidthDataTable(child: DataTable(
+              headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+              columnSpacing: 16, horizontalMargin: 20,
+              columns: ['Date', 'ID', 'Item', 'Qty', 'Urgency', 'Requested By', 'Reason', 'Status', 'Action']
+                .map((c) => DataColumn(label: Text(c, style: p.body(12, weight: FontWeight.w700)))).toList(),
+              rows: _requests.map((r) => DataRow(cells: [
+                DataCell(Text(r.date, style: p.body(12.5, color: p.textMuted))),
+                DataCell(Text(r.id, style: p.body(12.5, color: p.textMuted))),
+                DataCell(Text(r.item, style: p.body(13, weight: FontWeight.w600))),
+                DataCell(Text('${r.qty}', style: p.body(13, weight: FontWeight.w700, color: p.gold))),
+                DataCell(StatusChip(label: r.urgency, color: _urgencyColor(p, r.urgency))),
+                DataCell(Text(r.requester, style: p.body(12.5))),
+                DataCell(SizedBox(width: 160, child: Text(r.reason, style: p.body(12, color: p.textMuted), maxLines: 2, overflow: TextOverflow.ellipsis))),
+                DataCell(StatusChip(label: r.status, color: _statusColor(p, r.status))),
+                DataCell(r.status != 'Pending'
+                  ? Text('—', style: p.body(12.5, color: p.textMuted))
+                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                      _VSmBtn(p, 'Approve', p.success, () { setState(() => r.status = 'Approved'); toast(context, 'Request approved'); }),
+                      const SizedBox(width: 6),
+                      _VSmBtn(p, 'Reject', p.danger, () { setState(() => r.status = 'Rejected'); toast(context, 'Request rejected'); }),
+                    ])),
+              ])).toList(),
+            )))))),
+    ]);
+  }
+}
+
+Widget _VSmBtn(AppPalette p, String label, Color color, VoidCallback onTap) =>
+  GestureDetector(onTap: onTap, child: MouseRegion(cursor: SystemMouseCursors.click,
+    child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+      child: Text(label, style: p.body(11.5, color: color, weight: FontWeight.w700)))));
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RECEIVE GOODS TAB  (enhanced version with stock update)
+// ══════════════════════════════════════════════════════════════════════════════
+class _GRNEntry {
+  final String id, vendor, poNumber, receivedBy;
+  final DateTime date;
+  final List<_GRNItem> items;
+  final String status; // Partial / Complete
+  String notes;
+  _GRNEntry({required this.id, required this.vendor, required this.poNumber, required this.receivedBy, required this.date, required this.items, required this.status, this.notes = ''});
+  double get totalValue => items.fold(0.0, (s, i) => s + i.qty * i.unitPrice);
+}
+
+class _GRNItem { String name; int qty; double unitPrice; _GRNItem({required this.name, required this.qty, required this.unitPrice}); }
+
+class _ReceiveGoodsTab extends StatefulWidget {
+  const _ReceiveGoodsTab();
+  @override
+  State<_ReceiveGoodsTab> createState() => _ReceiveGoodsTabState();
+}
+
+class _ReceiveGoodsTabState extends State<_ReceiveGoodsTab> {
+  int _nextGrn = 1;
+  final _grns = <_GRNEntry>[
+    _GRNEntry(id: 'GRN-001', vendor: 'MedStar Supplies', poNumber: 'PO-001', receivedBy: 'Warehouse Manager',
+      date: DateTime(2026, 6, 28), items: [_GRNItem(name: 'PRP Kit', qty: 10, unitPrice: 4500), _GRNItem(name: 'Hair Serum', qty: 20, unitPrice: 1200)],
+      status: 'Complete'),
+    _GRNEntry(id: 'GRN-002', vendor: 'PharmaCare', poNumber: 'PO-004', receivedBy: 'Admin',
+      date: DateTime(2026, 7, 1), items: [_GRNItem(name: 'Surgical Gloves (M)', qty: 50, unitPrice: 15)],
+      status: 'Partial', notes: 'Remaining 50 units expected next week'),
+  ];
+
+  void _receiveGoods() {
+    final p = appState.palette;
+    Vendor? selectedVendor;
+    final receivedByCtrl = TextEditingController(text: 'Warehouse Manager');
+    final notesCtrl = TextEditingController();
+    final itemNameCtrl = TextEditingController();
+    final itemPriceCtrl = TextEditingController();
+    final items = <_GRNItem>[];
+    int itemQty = 1;
+    String status = 'Complete';
+
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(width: 620, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('RECEIVE GOODS', style: p.display(22, spacing: 1.0)),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: Dropdown2<Vendor?>(label: 'Vendor *', value: selectedVendor,
+              items: [const DropdownMenuItem<Vendor?>(value: null, child: Text('— Select Vendor —')),
+                ...appState.vendors.where((v) => v.isActive).map((v) => DropdownMenuItem(value: v, child: Text(v.name)))],
+              onChanged: (v) => ss(() => selectedVendor = v))),
+            const SizedBox(width: 14),
+            Expanded(child: FormField2(label: 'Received By', controller: receivedByCtrl, hint: 'Staff name')),
+            const SizedBox(width: 14),
+            Expanded(child: Dropdown2<String>(label: 'Status', value: status,
+              items: ['Complete', 'Partial'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              onChanged: (v) => ss(() => status = v ?? status))),
+          ]),
+          const SizedBox(height: 16),
+          Text('ITEMS RECEIVED', style: p.body(11, weight: FontWeight.w700, spacing: 1.0, color: p.textMuted)),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: FormField2(label: 'Item Name', controller: itemNameCtrl, hint: 'Product name')),
+            const SizedBox(width: 10),
+            SizedBox(width: 80, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('QTY', style: p.body(11, weight: FontWeight.w700, spacing: 1.0, color: p.textMuted)),
+              const SizedBox(height: 8),
+              Row(children: [
+                QtyButton(Icons.remove, () => ss(() { if (itemQty > 1) itemQty--; })),
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text('$itemQty', style: p.body(14))),
+                QtyButton(Icons.add, () => ss(() => itemQty++)),
+              ]),
+            ])),
+            const SizedBox(width: 10),
+            SizedBox(width: 140, child: FormField2(label: 'Unit Price (PKR)', controller: itemPriceCtrl, hint: '0', keyboard: TextInputType.number)),
+            const SizedBox(width: 10),
+            GoldButton(label: 'Add', onTap: () {
+              if (itemNameCtrl.text.isEmpty) return;
+              ss(() {
+                items.add(_GRNItem(name: itemNameCtrl.text, qty: itemQty, unitPrice: double.tryParse(itemPriceCtrl.text) ?? 0));
+                itemNameCtrl.clear(); itemPriceCtrl.clear(); itemQty = 1;
+              });
+            }),
+          ]),
+          if (items.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ...items.map((i) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [
+              Expanded(child: Text(i.name, style: p.body(12.5))),
+              Text('${i.qty} × ${money(i.unitPrice)}', style: p.body(12.5, color: p.textMuted)),
+              const SizedBox(width: 8),
+              GestureDetector(onTap: () => ss(() => items.remove(i)), child: Icon(Icons.close, size: 16, color: p.textMuted)),
+            ]))),
+            Align(alignment: Alignment.centerRight, child: Text('Total: ${money(items.fold(0.0, (s, i) => s + i.qty * i.unitPrice))}', style: p.body(14, weight: FontWeight.w700, color: p.gold))),
+          ],
+          const SizedBox(height: 14),
+          FormField2(label: 'Notes', controller: notesCtrl, hint: 'Remarks, discrepancies…', maxLines: 2),
+          const SizedBox(height: 24),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
+            const SizedBox(width: 12),
+            GoldButton(label: 'Confirm Receipt', onTap: () {
+              if (selectedVendor == null || items.isEmpty) return;
+              final grn = _GRNEntry(
+                id: 'GRN-${(_nextGrn + 2).toString().padLeft(3, '0')}',
+                vendor: selectedVendor!.name,
+                poNumber: 'PO-AUTO-$_nextGrn',
+                receivedBy: receivedByCtrl.text,
+                date: DateTime.now(),
+                items: List.from(items),
+                status: status,
+                notes: notesCtrl.text,
+              );
+              // update stock quantities
+              for (final item in items) {
+                final stockItem = appState.stockItems.where((s) => s.name.toLowerCase().contains(item.name.toLowerCase())).firstOrNull;
+                if (stockItem != null) { stockItem.currentQty += item.qty; stockItem.lastUpdated = DateTime.now(); }
+              }
+              setState(() { _grns.insert(0, grn); _nextGrn++; });
+              appState.touch();
+              Navigator.pop(ctx);
+              toast(context, 'Goods receipt recorded — stock updated');
+            }),
+          ]),
+        ])),
+      ),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return Column(children: [
+      Row(children: [const Spacer(), GoldButton(label: 'Receive Goods', icon: Icons.move_to_inbox_outlined, onTap: _receiveGoods)]),
+      const SizedBox(height: 12),
+      Expanded(child: _grns.isEmpty
+        ? Center(child: Text('No goods received yet.', style: p.body(13, color: p.textMuted)))
+        : Panel(padding: EdgeInsets.zero, child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc,
+            child: FullWidthDataTable(child: DataTable(
+              headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+              columnSpacing: 16, horizontalMargin: 20,
+              columns: ['Date', 'GRN #', 'Vendor', 'PO #', 'Items', 'Total Value', 'Received By', 'Status']
+                .map((c) => DataColumn(label: Text(c, style: p.body(12, weight: FontWeight.w700)))).toList(),
+              rows: _grns.map((g) => DataRow(cells: [
+                DataCell(Text(prettyShort(g.date), style: p.body(12.5, color: p.textMuted))),
+                DataCell(Text(g.id, style: p.body(12.5, weight: FontWeight.w700))),
+                DataCell(Text(g.vendor, style: p.body(13, weight: FontWeight.w600))),
+                DataCell(Text(g.poNumber, style: p.body(12.5, color: p.textMuted))),
+                DataCell(Text('${g.items.length} item${g.items.length != 1 ? 's' : ''}', style: p.body(12.5))),
+                DataCell(Text(money(g.totalValue), style: p.body(13, weight: FontWeight.w700, color: p.gold))),
+                DataCell(Text(g.receivedBy, style: p.body(12.5))),
+                DataCell(StatusChip(label: g.status, color: g.status == 'Complete' ? p.success : p.warning)),
+              ])).toList(),
+            )))))),
+    ]);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// VENDOR PAYMENTS TAB
+// ══════════════════════════════════════════════════════════════════════════════
+class _VendorPayment {
+  final String id, vendor, invoiceNo, method, notes;
+  final double amount;
+  String status; // Pending / Paid
+  final String date;
+  _VendorPayment({required this.id, required this.date, required this.vendor, required this.invoiceNo, required this.amount, required this.method, this.notes = '', this.status = 'Pending'});
+}
+
+class _VendorPaymentsTab extends StatefulWidget {
+  const _VendorPaymentsTab();
+  @override
+  State<_VendorPaymentsTab> createState() => _VendorPaymentsTabState();
+}
+
+class _VendorPaymentsTabState extends State<_VendorPaymentsTab> {
+  int _nextId = 4;
+  static const _methods = ['Cash', 'Bank Transfer', 'Cheque'];
+
+  final _payments = <_VendorPayment>[
+    _VendorPayment(id: 'VP-001', date: '25 Jun 2026', vendor: 'MedStar Supplies', invoiceNo: 'INV-1021', amount: 85000, method: 'Bank Transfer', status: 'Paid'),
+    _VendorPayment(id: 'VP-002', date: '1 Jul 2026', vendor: 'PharmaCare', invoiceNo: 'INV-5542', amount: 32500, method: 'Cheque', status: 'Pending'),
+    _VendorPayment(id: 'VP-003', date: '3 Jul 2026', vendor: 'LabTech Solutions', invoiceNo: 'INV-7710', amount: 15000, method: 'Cash', status: 'Pending'),
+  ];
+
+  void _recordPayment() {
+    final p = appState.palette;
+    Vendor? selectedVendor;
+    final amtCtrl = TextEditingController();
+    final invCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    String method = 'Bank Transfer';
+    DateTime date = DateTime.now();
+
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(width: 540, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('RECORD VENDOR PAYMENT', style: p.display(22, spacing: 1.0)),
+          const SizedBox(height: 20),
+          Dropdown2<Vendor?>(label: 'Vendor *', value: selectedVendor,
+            items: [const DropdownMenuItem<Vendor?>(value: null, child: Text('— Select Vendor —')),
+              ...appState.vendors.where((v) => v.isActive).map((v) => DropdownMenuItem(value: v, child: Text(v.name)))],
+            onChanged: (v) => ss(() => selectedVendor = v)),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: FormField2(label: 'Invoice No. *', controller: invCtrl, hint: 'INV-XXXX')),
+            const SizedBox(width: 14),
+            Expanded(child: FormField2(label: 'Amount (PKR) *', controller: amtCtrl, hint: '0.00', keyboard: TextInputType.number)),
+          ]),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: Dropdown2<String>(label: 'Payment Method', value: method,
+              items: _methods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+              onChanged: (v) => ss(() => method = v ?? method))),
+            const SizedBox(width: 14),
+            Expanded(child: _VendorDatePicker(label: 'Payment Date', value: date, palette: p, onPick: (d) => ss(() => date = d))),
+          ]),
+          const SizedBox(height: 14),
+          FormField2(label: 'Notes', controller: notesCtrl, hint: 'Payment remarks…', maxLines: 2),
+          const SizedBox(height: 24),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
+            const SizedBox(width: 12),
+            GoldButton(label: 'Record Payment', onTap: () {
+              if (selectedVendor == null || invCtrl.text.isEmpty) return;
+              final amt = double.tryParse(amtCtrl.text);
+              if (amt == null || amt <= 0) return;
+              setState(() {
+                _payments.insert(0, _VendorPayment(
+                  id: 'VP-${_nextId.toString().padLeft(3, '0')}',
+                  date: prettyShort(date),
+                  vendor: selectedVendor!.name,
+                  invoiceNo: invCtrl.text,
+                  amount: amt,
+                  method: method,
+                  notes: notesCtrl.text,
+                ));
+                _nextId++;
+              });
+              Navigator.pop(ctx);
+              toast(context, 'Payment recorded');
+            }),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final totalPayable = _payments.where((p) => p.status == 'Pending').fold(0.0, (s, p) => s + p.amount);
+    final paidThisMonth = _payments.where((p) => p.status == 'Paid').fold(0.0, (s, p) => s + p.amount);
+    final overdueCount = _payments.where((p) => p.status == 'Pending').length;
+    final pendingApproval = _payments.where((p) => p.status == 'Pending').length;
+
+    return Column(children: [
+      MetricRow([
+        MetricCard(title: 'Total Payable', value: money(totalPayable), icon: Icons.payments_outlined, delta: '$overdueCount pending', deltaUp: false),
+        MetricCard(title: 'Paid This Month', value: money(paidThisMonth), icon: Icons.check_circle_outline, delta: 'settled', deltaUp: true),
+        MetricCard(title: 'Overdue Payments', value: '$overdueCount', icon: Icons.warning_amber_outlined, delta: 'require attention', deltaUp: false),
+        MetricCard(title: 'Pending Approvals', value: '$pendingApproval', icon: Icons.pending_actions_outlined, delta: ''),
+      ]),
+      const SizedBox(height: 12),
+      Row(children: [const Spacer(), GoldButton(label: 'Record Payment', icon: Icons.add, onTap: _recordPayment)]),
+      const SizedBox(height: 12),
+      Expanded(child: _payments.isEmpty
+        ? Center(child: Text('No payment records.', style: p.body(13, color: p.textMuted)))
+        : Panel(padding: EdgeInsets.zero, child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc,
+            child: FullWidthDataTable(child: DataTable(
+              headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+              columnSpacing: 16, horizontalMargin: 20,
+              columns: ['Date', 'ID', 'Vendor', 'Invoice No.', 'Amount', 'Method', 'Status', 'Action']
+                .map((c) => DataColumn(label: Text(c, style: p.body(12, weight: FontWeight.w700)))).toList(),
+              rows: _payments.map((pay) => DataRow(cells: [
+                DataCell(Text(pay.date, style: p.body(12.5, color: p.textMuted))),
+                DataCell(Text(pay.id, style: p.body(12.5, color: p.textMuted))),
+                DataCell(Text(pay.vendor, style: p.body(13, weight: FontWeight.w600))),
+                DataCell(Text(pay.invoiceNo, style: p.body(12.5))),
+                DataCell(Text(money(pay.amount), style: p.body(13.5, weight: FontWeight.w700, color: p.gold))),
+                DataCell(StatusChip(label: pay.method, color: p.info)),
+                DataCell(StatusChip(label: pay.status, color: pay.status == 'Paid' ? p.success : p.warning)),
+                DataCell(pay.status == 'Paid'
+                  ? Text('—', style: p.body(12.5, color: p.textMuted))
+                  : GoldButton(label: 'Mark Paid', onTap: () { setState(() => pay.status = 'Paid'); toast(context, 'Payment marked as paid'); })),
+              ])).toList(),
+            )))))),
+    ]);
+  }
+}
+
+// ── Shared date picker for vendor tabs ────────────────────────────────────────
+class _VendorDatePicker extends StatelessWidget {
+  final String label;
+  final DateTime value;
+  final AppPalette palette;
+  final ValueChanged<DateTime> onPick;
+  const _VendorDatePicker({required this.label, required this.value, required this.palette, required this.onPick});
+  @override
+  Widget build(BuildContext context) {
+    final p = palette;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: p.body(12, color: p.textMuted, weight: FontWeight.w600)),
+      const SizedBox(height: 7),
+      GestureDetector(
+        onTap: () async {
+          final picked = await showDatePicker(context: context, initialDate: value,
+            firstDate: DateTime(2020), lastDate: DateTime(2030),
+            builder: (ctx, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: ColorScheme.dark(primary: p.gold, surface: p.surface)), child: child!));
+          if (picked != null) onPick(picked);
+        },
+        child: Container(height: 46, padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+          child: Row(children: [Icon(Icons.calendar_today_outlined, size: 15, color: p.gold), const SizedBox(width: 10), Text(prettyShort(value), style: p.body(13.5, weight: FontWeight.w500))])),
+      ),
+    ]);
+  }
+}
+

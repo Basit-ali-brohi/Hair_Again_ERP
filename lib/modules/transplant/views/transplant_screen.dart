@@ -31,7 +31,7 @@ class _TransplantScreenState extends State<TransplantScreen> with SingleTickerPr
             tabs: const [Tab(text: 'Surgery Cases'), Tab(text: 'Scheduled'), Tab(text: 'Post-Op Follow-Up')]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
+      child: EagerTabBarView(controller: _tab, children: const [
         _CasesTab(), _ScheduledTab(), _PostOpTab(),
       ]),
     );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core.dart';
@@ -27,13 +28,15 @@ import '../../modules/vendors/views/vendors_screen.dart';
 import '../../modules/products/views/products_screen.dart';
 import '../../modules/hair_patch/views/hair_patch_screen.dart';
 import '../../modules/inventory/views/inventory_screen.dart';
+import '../../modules/notifications/views/notifications_screen.dart';
+import '../../modules/security/views/security_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 const _kRail = 64.0;
 const _kNav  = 214.0;
-const _kDarkGreen = Color(0xFF0C4F28);
+const _kRailBg = Color(0xFF2A1E00);
 
 List<BoxShadow> get _shadow => [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 20, offset: const Offset(0, 6))];
 
@@ -57,6 +60,7 @@ const _kGroups = [
   _Group(Icons.trending_up_rounded,            'Growth',     [9, 12]),
   _Group(Icons.inventory_2_outlined,           'Inventory',  [19, 20, 22]),
   _Group(Icons.admin_panel_settings_outlined,  'Admin',      [5, 13, 14]),
+  _Group(Icons.notifications_outlined,          'Comms & Sec', [23, 24]),
 ];
 
 const _kModLabel = {
@@ -83,6 +87,8 @@ const _kModLabel = {
   20: (icon: Icons.inventory_outlined,           label: 'Products'),
   21: (icon: Icons.face_outlined,               label: 'Hair Patch'),
   22: (icon: Icons.warehouse_outlined,          label: 'Stock Management'),
+  23: (icon: Icons.notifications_outlined,      label: 'Notifications'),
+  24: (icon: Icons.security_outlined,           label: 'Security Center'),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,9 +103,10 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   int _group = 0;
 
-  final _crmKey  = GlobalKey<CrmScreenState>();
-  final _posKey  = GlobalKey<PosScreenState>();
-  final _apptKey = GlobalKey<AppointmentsScreenState>();
+  final _crmKey      = GlobalKey<CrmScreenState>();
+  final _posKey      = GlobalKey<PosScreenState>();
+  final _apptKey     = GlobalKey<AppointmentsScreenState>();
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   int _groupFor(int idx) {
     for (int i = 0; i < _kGroups.length; i++) {
@@ -133,16 +140,23 @@ class _ShellState extends State<Shell> {
     final state = AppScope.of(context);
     final p = state.palette;
     final idx = state.activeIndex;
-    final accessible = state.currentUser?.role.accessibleIndices ?? <int>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22};
+    final accessible = state.currentUser?.role.accessibleIndices ?? <int>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24};
 
     // auto-sync group when module navigated externally
     final computed = _groupFor(idx);
     if (_group != computed) _group = computed;
 
-    return Scaffold(
-      backgroundColor: p.bg,
-      body: Row(
-        children: [
+    final isMobile = defaultTargetPlatform == TargetPlatform.android ||
+                      defaultTargetPlatform == TargetPlatform.iOS;
+    if (isMobile) {
+      return _buildMobile(context, p, idx, accessible);
+    }
+
+    return Material(
+      color: p.bg,
+      child: SafeArea(
+        child: Row(
+          children: [
           // ── Icon Rail ──────────────────────────────────────────────
           _IconRail(
             group: _group,
@@ -178,39 +192,136 @@ class _ShellState extends State<Shell> {
                   },
                 ),
                 Expanded(
-                  child: IndexedStack(
-                    index: idx,
-                    children: [
-                      DashboardScreen(onRegisterPatient: _registerPatient, onBookAppointment: _bookAppointment, onCreateInvoice: _createInvoice, onLowStock: _lowStock),
-                      CrmScreen(key: _crmKey),
-                      PosScreen(key: _posKey),
-                      AppointmentsScreen(key: _apptKey),
-                      const ReportsScreen(),
-                      const SettingsScreen(),
-                      const InvoicesScreen(),
-                      const StaffScreen(),
-                      const HrScreen(),
-                      const LeadsScreen(),
-                      const ConsultationScreen(),
-                      const FinanceScreen(),
-                      const MarketingScreen(),
-                      const UserRolesScreen(),
-                      const CompanyScreen(),
-                      const TreatmentScreen(),
-                      const TransplantScreen(),
-                      const MembershipScreen(),
-                      const LoyaltyScreen(),
-                      const VendorsScreen(),
-                      const ProductsScreen(),
-                      const HairPatchScreen(),
-                      const InventoryScreen(),
-                    ],
-                  ),
+                  child: _buildActiveScreen(idx),
                 ),
               ],
             ),
           ),
         ],
+        ),
+      ),
+    );
+
+  }
+
+  Widget _buildActiveScreen(int idx) {
+    return switch (idx) {
+      0  => DashboardScreen(onRegisterPatient: _registerPatient, onBookAppointment: _bookAppointment, onCreateInvoice: _createInvoice, onLowStock: _lowStock),
+      1  => CrmScreen(key: _crmKey),
+      2  => PosScreen(key: _posKey),
+      3  => AppointmentsScreen(key: _apptKey),
+      4  => const ReportsScreen(),
+      5  => const SettingsScreen(),
+      6  => const InvoicesScreen(),
+      7  => const StaffScreen(),
+      8  => const HrScreen(),
+      9  => const LeadsScreen(),
+      10 => const ConsultationScreen(),
+      11 => const FinanceScreen(),
+      12 => const MarketingScreen(),
+      13 => const UserRolesScreen(),
+      14 => const CompanyScreen(),
+      15 => const TreatmentScreen(),
+      16 => const TransplantScreen(),
+      17 => const MembershipScreen(),
+      18 => const LoyaltyScreen(),
+      19 => const VendorsScreen(),
+      20 => const ProductsScreen(),
+      21 => const HairPatchScreen(),
+      22 => const InventoryScreen(),
+      23 => const NotificationsScreen(),
+      24 => const SecurityScreen(),
+      _  => const SizedBox.shrink(),
+    };
+  }
+
+  Widget _buildMobile(BuildContext context, AppPalette p, int idx, Set<int> accessible) {
+    final group = _kGroups[_group];
+    final mod   = _kModLabel[idx];
+
+    final int bottomTab = switch (idx) {
+      0 => 0, 3 => 1, 1 => 2, 2 => 3, _ => 4,
+    };
+
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: p.bg,
+      floatingActionButton: null,
+      floatingActionButtonLocation: null,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(56),
+        child: Container(
+          color: p.sidebar,
+          child: SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: 56,
+              child: Row(children: [
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: Icon(Icons.menu_rounded, color: p.text),
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                ),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(mod?.label ?? 'Dashboard',
+                          style: p.body(14, weight: FontWeight.w700),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(group.label, style: p.body(10.5, color: p.textMuted)),
+                    ],
+                  ),
+                ),
+                Stack(clipBehavior: Clip.none, children: [
+                  IconButton(
+                    icon: Icon(Icons.notifications_none_rounded, color: p.text),
+                    onPressed: () => appState.go(23),
+                  ),
+                  if (appState.unreadCount > 0) Positioned(
+                    right: 8, top: 8,
+                    child: Container(
+                      width: 8, height: 8,
+                      decoration: BoxDecoration(color: p.danger, shape: BoxShape.circle),
+                    ),
+                  ),
+                ]),
+                const ThemeToggle(),
+                const SizedBox(width: 4),
+              ]),
+            ),
+          ),
+        ),
+      ),
+      drawer: _MobileDrawer(activeIndex: idx, accessible: accessible),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: bottomTab,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: p.sidebar,
+        selectedItemColor: p.gold,
+        unselectedItemColor: p.textMuted,
+        selectedFontSize: 10,
+        unselectedFontSize: 10,
+        elevation: 8,
+        onTap: (i) {
+          if (i == 4) {
+            _scaffoldKey.currentState?.openDrawer();
+          } else {
+            const targets = [0, 3, 1, 2];
+            appState.go(targets[i]);
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_month_outlined), label: 'Appts'),
+          BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), label: 'Patients'),
+          BottomNavigationBarItem(icon: Icon(Icons.point_of_sale_outlined), label: 'POS'),
+          BottomNavigationBarItem(icon: Icon(Icons.menu_rounded), label: 'Menu'),
+        ],
+      ),
+      body: SafeArea(
+        child: _buildActiveScreen(idx),
       ),
     );
   }
@@ -231,7 +342,7 @@ class _IconRail extends StatelessWidget {
     final p = AppScope.of(context).palette;
     return Container(
       width: _kRail,
-      color: _kDarkGreen,
+      color: _kRailBg,
       child: Column(
         children: [
           const SizedBox(height: 18),
@@ -338,25 +449,53 @@ class _RailIconState extends State<_RailIcon> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Nav Panel (214px, white background)
 // ─────────────────────────────────────────────────────────────────────────────
-class _NavPanel extends StatelessWidget {
+class _NavPanel extends StatefulWidget {
   final int group;
   final int activeIndex;
   final Set<int> accessible;
   final AppState state;
   const _NavPanel({required this.group, required this.activeIndex, required this.accessible, required this.state});
+  @override
+  State<_NavPanel> createState() => _NavPanelState();
+}
+
+class _NavPanelState extends State<_NavPanel> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppScope.of(context).palette;
-    final g = _kGroups[group];
-    final mods = g.indices.where(accessible.contains).toList();
+    final g = _kGroups[widget.group];
+    final bool isSearching = _searchQuery.trim().isNotEmpty;
+
+    // When searching: scan ALL accessible modules across all groups
+    final List<int> filteredMods;
+    final String sectionLabel;
+    if (isSearching) {
+      final q = _searchQuery.toLowerCase();
+      filteredMods = _kModLabel.entries
+          .where((e) => widget.accessible.contains(e.key) && e.value.label.toLowerCase().contains(q))
+          .map((e) => e.key)
+          .toList()..sort();
+      sectionLabel = filteredMods.isEmpty ? 'NO RESULTS' : '${filteredMods.length} MODULE${filteredMods.length == 1 ? '' : 'S'} FOUND';
+    } else {
+      filteredMods = g.indices.where(widget.accessible.contains).toList();
+      sectionLabel = g.label.toUpperCase();
+    }
 
     return Container(
       width: _kNav,
       decoration: BoxDecoration(
         color: p.sidebar,
         border: Border(right: BorderSide(color: p.border)),
-        boxShadow: p.isDark ? [] : [BoxShadow(color: const Color(0xFF0C4A26).withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(2, 0))],
+        boxShadow: p.isDark ? [] : [BoxShadow(color: const Color(0xFF6B4500).withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(2, 0))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,7 +509,7 @@ class _NavPanel extends StatelessWidget {
             ]),
           ),
 
-          // ── Search (visual) ───────────────────────────────────────
+          // ── Search (functional) ───────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Container(
@@ -380,7 +519,29 @@ class _NavPanel extends StatelessWidget {
                 const SizedBox(width: 11),
                 Icon(Icons.search, size: 16, color: p.textMuted),
                 const SizedBox(width: 8),
-                Text('Search modules…', style: p.body(12.5, color: p.textMuted.withValues(alpha: 0.7))),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: p.body(12.5),
+                    cursorColor: p.gold,
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: 'Search modules…',
+                      hintStyle: p.body(12.5, color: p.textMuted.withValues(alpha: 0.7)),
+                    ),
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                  ),
+                ),
+                if (_searchQuery.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    child: Icon(Icons.close, size: 15, color: p.textMuted),
+                  ),
+                const SizedBox(width: 10),
               ]),
             ),
           ),
@@ -390,16 +551,23 @@ class _NavPanel extends StatelessWidget {
           // ── Section label ─────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
-            child: Text(g.label.toUpperCase(), style: p.body(10, color: p.textMuted, weight: FontWeight.w700, spacing: 1.4)),
+            child: Text(sectionLabel, style: p.body(10, color: p.textMuted, weight: FontWeight.w700, spacing: 1.4)),
           ),
 
           // ── Module list ───────────────────────────────────────────
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              children: mods.map((i) {
+              children: filteredMods.map((i) {
                 final mod = _kModLabel[i]!;
-                return _NavItem(index: i, icon: mod.icon, label: mod.label, active: activeIndex == i);
+                return GestureDetector(
+                  onTap: isSearching ? () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                    appState.go(i);
+                  } : null,
+                  child: _NavItem(index: i, icon: mod.icon, label: mod.label, active: widget.activeIndex == i),
+                );
               }).toList(),
             ),
           ),
@@ -423,7 +591,7 @@ class _NavPanel extends StatelessWidget {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF0C4F28), Color(0xFF166534)],
+                colors: [Color(0xFF3D2B00), Color(0xFF6B4500)],
               ),
               borderRadius: BorderRadius.circular(6),
             ),
@@ -444,7 +612,7 @@ class _NavPanel extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                child: const Text('Upgrade', style: TextStyle(fontSize: 12.5, color: Color(0xFF0C4F28), fontWeight: FontWeight.w800)),
+                child: const Text('Upgrade', style: TextStyle(fontSize: 12.5, color: Color(0xFF3D2B00), fontWeight: FontWeight.w800)),
               ),
             ]),
           ),
@@ -459,12 +627,12 @@ class _NavPanel extends StatelessWidget {
             CircleAvatar(
               radius: 15,
               backgroundColor: p.gold.withValues(alpha: 0.18),
-              child: Text(state.currentUser?.initials ?? 'HA', style: p.body(10.5, color: p.gold, weight: FontWeight.w700)),
+              child: Text(widget.state.currentUser?.initials ?? 'HA', style: p.body(10.5, color: p.gold, weight: FontWeight.w700)),
             ),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(state.currentUser?.name ?? 'Hair Again', style: p.body(12, weight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text(state.currentUser?.role.label ?? 'System', style: p.body(10, color: p.textMuted), maxLines: 1),
+              Text(widget.state.currentUser?.name ?? 'Hair Again', style: p.body(12, weight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(widget.state.currentUser?.role.label ?? 'System', style: p.body(10, color: p.textMuted), maxLines: 1),
             ])),
             GestureDetector(
               onTap: () => appState.logout(),
@@ -526,6 +694,116 @@ class _NavItemState extends State<_NavItem> {
         ),
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mobile Drawer
+// ─────────────────────────────────────────────────────────────────────────────
+class _MobileDrawer extends StatelessWidget {
+  final int activeIndex;
+  final Set<int> accessible;
+  const _MobileDrawer({required this.activeIndex, required this.accessible});
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final p = scope.palette;
+    return Drawer(
+      backgroundColor: p.sidebar,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('HAIR AGAIN', style: p.display(22, spacing: 2.0, color: p.gold)),
+                Text('CLINIC ERP • KARACHI', style: p.body(9, color: p.textMuted, weight: FontWeight.w700, spacing: 1.5)),
+              ]),
+            ),
+            Divider(height: 1, color: p.border),
+            const SizedBox(height: 4),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                children: _buildItems(context, p),
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: p.surfaceAlt,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: p.border),
+              ),
+              child: Row(children: [
+                CircleAvatar(
+                  radius: 15,
+                  backgroundColor: p.gold.withValues(alpha: 0.18),
+                  child: Text(scope.currentUser?.initials ?? 'HA',
+                      style: p.body(10.5, color: p.gold, weight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(scope.currentUser?.name ?? 'Hair Again',
+                      style: p.body(12, weight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(scope.currentUser?.role.label ?? 'System',
+                      style: p.body(10, color: p.textMuted), maxLines: 1),
+                ])),
+                GestureDetector(
+                  onTap: () => appState.logout(),
+                  child: Tooltip(message: 'Sign Out', child: Icon(Icons.logout, size: 15, color: p.textMuted)),
+                ),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildItems(BuildContext context, AppPalette p) {
+    final items = <Widget>[];
+    for (final g in _kGroups) {
+      final mods = g.indices.where(accessible.contains).toList();
+      if (mods.isEmpty) continue;
+      items.add(Padding(
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
+        child: Text(g.label.toUpperCase(),
+            style: p.body(10, color: p.textMuted, weight: FontWeight.w700, spacing: 1.4)),
+      ));
+      for (final i in mods) {
+        final mod = _kModLabel[i]!;
+        final isActive = activeIndex == i;
+        items.add(GestureDetector(
+          onTap: () {
+            appState.go(i);
+            Navigator.of(context).pop();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(bottom: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+            decoration: BoxDecoration(
+              color: isActive ? p.gold.withValues(alpha: 0.13) : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(children: [
+              Icon(mod.icon, size: 18, color: isActive ? p.gold : p.textMuted),
+              const SizedBox(width: 11),
+              Expanded(child: Text(mod.label,
+                  style: p.body(13, color: isActive ? p.gold : p.text,
+                      weight: isActive ? FontWeight.w700 : FontWeight.w500),
+                  maxLines: 1, overflow: TextOverflow.ellipsis)),
+              if (isActive) Container(width: 7, height: 7, decoration: BoxDecoration(color: p.gold, shape: BoxShape.circle)),
+            ]),
+          ),
+        ));
+      }
+    }
+    return items;
   }
 }
 

@@ -1,12 +1,14 @@
 // modules/appointments/models — Clinic appointment slot domain model.
 
-enum ApptStatus { confirmed, pending, cancelled }
+enum ApptStatus { confirmed, pending, cancelled, checkedIn, completed }
 
 extension ApptStatusX on ApptStatus {
   String get label => switch (this) {
         ApptStatus.confirmed => 'Confirmed',
         ApptStatus.pending => 'Pending',
         ApptStatus.cancelled => 'Cancelled',
+        ApptStatus.checkedIn => 'Checked In',
+        ApptStatus.completed => 'Completed',
       };
 }
 

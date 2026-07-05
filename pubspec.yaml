@@ -45,6 +45,9 @@ dependencies:
   # Local data persistence — survives app restarts.
   shared_preferences: ^2.3.2
 
+  # Native file-picker dialog (used for Before/After photo gallery).
+  file_picker: ^8.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -9,6 +9,11 @@ class StorageService {
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    // One-time migration: switch default accent from Forest Green (1) to Brushed Gold (0)
+    if ((_prefs!.getInt('themeVersion') ?? 0) < 2) {
+      await _prefs!.setInt('accentIndex', 0);
+      await _prefs!.setInt('themeVersion', 2);
+    }
   }
 
   // ── Settings ────────────────────────────────────────────────────────────────

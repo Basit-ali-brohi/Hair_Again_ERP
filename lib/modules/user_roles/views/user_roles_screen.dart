@@ -37,7 +37,7 @@ class _UserRolesScreenState extends State<UserRolesScreen> with SingleTickerProv
           ),
         ),
       ],
-      child: TabBarView(controller: _tab, children: [
+      child: EagerTabBarView(controller: _tab, children: [
         _UsersTab(onUpdate: () => setState(() {})),
         const _RolesTab(),
         const _ActivityTab(),

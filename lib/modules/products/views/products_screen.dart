@@ -11,7 +11,7 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProviderStateMixin {
   late final TabController _tab;
   @override
-  void initState() { super.initState(); _tab = TabController(length: 4, vsync: this); }
+  void initState() { super.initState(); _tab = TabController(length: 5, vsync: this); }
   @override
   void dispose() { _tab.dispose(); super.dispose(); }
 
@@ -28,11 +28,11 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
             indicatorColor: p.gold, indicatorSize: TabBarIndicatorSize.label,
             labelStyle: p.body(12.5, weight: FontWeight.w600), unselectedLabelStyle: p.body(12.5),
             labelColor: p.gold, unselectedLabelColor: p.textMuted, tabAlignment: TabAlignment.start,
-            tabs: const [Tab(text: 'Products'), Tab(text: 'Categories'), Tab(text: 'Brands'), Tab(text: 'Pricing')]),
+            tabs: const [Tab(text: 'Products'), Tab(text: 'Categories'), Tab(text: 'Brands'), Tab(text: 'Pricing'), Tab(text: 'Images')]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
-        _ProductsTab(), _CategoriesTab(), _BrandsTab(), _PricingTab(),
+      child: EagerTabBarView(controller: _tab, children: const [
+        _ProductsTab(), _CategoriesTab(), _BrandsTab(), _PricingTab(), _ImagesTab(),
       ]),
     );
   }
@@ -411,6 +411,43 @@ class _PricingTabState extends State<_PricingTab> {
           DataCell(Text(money(pr.stockQty * pr.sellingPrice), style: p.body(12.5))),
         ])).toList(),
       )))))),
+    ]);
+  }
+}
+
+// ── Product Images ────────────────────────────────────────────────────────────
+class _ImagesTab extends StatefulWidget {
+  const _ImagesTab();
+  @override
+  State<_ImagesTab> createState() => _ImagesTabState();
+}
+
+class _ImagesTabState extends State<_ImagesTab> {
+  String _search = '';
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final products = appState.products.where((pr) => _search.isEmpty || pr.name.toLowerCase().contains(_search.toLowerCase())).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.only(bottom: 14, right: 12), child: Row(children: [
+        Expanded(child: FormField2(label: '', controller: TextEditingController(text: _search), hint: 'Search products...', onChanged: (v) => setState(() => _search = v))),
+      ])),
+      Expanded(child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, padding: const EdgeInsets.only(right: 12, bottom: 28),
+        child: Wrap(spacing: 14, runSpacing: 14, children: products.map((pr) {
+          return SizedBox(width: 200, child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(height: 120, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(6)), child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.image_outlined, size: 36, color: p.textMuted),
+              const SizedBox(height: 6),
+              Text('No image', style: p.body(11, color: p.textMuted)),
+            ]))),
+            const SizedBox(height: 10),
+            Text(pr.name, style: p.body(13, weight: FontWeight.w700), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(pr.categoryName, style: p.body(11, color: p.textMuted)),
+            const SizedBox(height: 10),
+            GoldButton(label: 'Upload Image', icon: Icons.upload_outlined, onTap: () => toast(context, 'Image upload coming soon')),
+          ])));
+        }).toList()),
+      ))),
     ]);
   }
 }

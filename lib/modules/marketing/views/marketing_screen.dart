@@ -37,7 +37,7 @@ class _MarketingScreenState extends State<MarketingScreen> with SingleTickerProv
           ),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
+      child: EagerTabBarView(controller: _tab, children: const [
         _CampaignsTab(), _PromotionsTab(), _CouponsTab(), _AnalyticsTab(),
       ]),
     );

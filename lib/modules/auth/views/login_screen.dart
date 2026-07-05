@@ -51,8 +51,21 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       return;
     }
     setState(() => _loading = false);
-    appState.login(user);
+    
+    // If MFA enabled, show OTP dialog first
+    if (user.mfaEnabled) {
+      _showMfaDialog(user);
+    } else {
+      appState.login(user);
+    }
   }
+
+  // MFA OTP dialog
+  void _showMfaDialog(AppUser user) => showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _MfaDialog(user: user),
+  );
 
   void _showDemoAccounts() {
     final p = appState.palette;
@@ -119,236 +132,279 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       backgroundColor: p.bg,
       body: FadeTransition(
         opacity: _fade,
-        child: Row(
-          children: [
-            // ── Left hero panel ──────────────────────────────────────────────
-            Expanded(
-              flex: 5,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [const Color(0xFF0E0E12), const Color(0xFF1A1500), const Color(0xFF0E0E12)],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
-                ),
-                child: Stack(
-                  children: [
-                    // Grid pattern
-                    CustomPaint(painter: _GridPainter(), child: const SizedBox.expand()),
-                    SingleChildScrollView(
-                      padding: const EdgeInsets.all(52),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Logo
-                          Row(children: [
-                            Container(
-                              width: 56, height: 56,
-                              decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(14)),
-                              child: const Icon(Icons.spa_outlined, color: Colors.black87, size: 28),
-                            ),
-                            const SizedBox(width: 16),
-                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text('HAIR AGAIN', style: p.display(32, spacing: 2.0, color: const Color(0xFFC9A24B))),
-                              Text('CLINIC ERP • KARACHI', style: p.body(11, color: const Color(0xFF9A9AA6), weight: FontWeight.w600, spacing: 2.0)),
-                            ]),
-                          ]),
-                          const SizedBox(height: 48),
-                          // Headline
-                          Text('Premium\nHair Care\nManagement', style: GoogleFonts.bebasNeue(fontSize: 68, color: Colors.white, letterSpacing: 1.5, height: 1.05)),
-                          const SizedBox(height: 18),
-                          Text('The complete ERP solution for modern\nhair transplant & care clinics.', style: p.body(15, color: const Color(0xFF9A9AA6))),
-                          const SizedBox(height: 36),
-                          // Stats
-                          Row(children: [
-                            _StatBubble(value: '165+', label: 'Screens', palette: p),
-                            const SizedBox(width: 24),
-                            _StatBubble(value: '22', label: 'Modules', palette: p),
-                            const SizedBox(width: 24),
-                            _StatBubble(value: '100%', label: 'Secure', palette: p),
-                          ]),
-                          const SizedBox(height: 36),
-                          // Feature bullets
-                          ...[
-                            (Icons.group_outlined, 'Full CRM & Patient Journey Tracking'),
-                            (Icons.point_of_sale_outlined, 'POS, Inventory & Billing'),
-                            (Icons.people_outlined, 'HR, Payroll & Recruitment'),
-                            (Icons.trending_up_outlined, 'Finance, Reports & Analytics'),
-                          ].map((f) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(children: [
-                              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFC9A24B).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)), child: Icon(f.$1, size: 17, color: const Color(0xFFC9A24B))),
-                              const SizedBox(width: 14),
-                              Text(f.$2, style: p.body(14, color: Colors.white70, weight: FontWeight.w500)),
-                            ]),
-                          )),
-                          const SizedBox(height: 32),
-                          Text('© 2026 Hair Again Clinic ERP. All rights reserved.', style: p.body(11, color: const Color(0xFF9A9AA6))),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── Right form panel ─────────────────────────────────────────────
-            Expanded(
-              flex: 4,
-              child: Container(
-                color: p.sidebar,
-                child: Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(56),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 400),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Welcome Back', style: p.display(42, spacing: 0.5)),
-                          const SizedBox(height: 8),
-                          Text('Sign in to your account to continue', style: p.body(14, color: p.textMuted)),
-                          const SizedBox(height: 40),
-
-                          // Error
-                          if (_error != null) ...[
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(color: p.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: p.danger.withValues(alpha: 0.35))),
-                              child: Row(children: [
-                                Icon(Icons.error_outline, color: p.danger, size: 18),
-                                const SizedBox(width: 10),
-                                Expanded(child: Text(_error!, style: p.body(13, color: p.danger))),
-                              ]),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-
-                          // Email
-                          _FieldLabel('Email Address', p),
-                          const SizedBox(height: 8),
-                          _LoginField(
-                            controller: _emailCtrl, palette: p,
-                            hint: 'admin@hairagain.pk',
-                            prefix: Icons.email_outlined,
-                            keyboardType: TextInputType.emailAddress,
-                            onSubmit: (_) {},
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Password
-                          _FieldLabel('Password', p),
-                          const SizedBox(height: 8),
-                          _LoginField(
-                            controller: _passCtrl, palette: p,
-                            hint: '••••••••',
-                            prefix: Icons.lock_outline,
-                            obscure: _obscure,
-                            suffixIcon: GestureDetector(
-                              onTap: () => setState(() => _obscure = !_obscure),
-                              child: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18, color: p.textMuted),
-                            ),
-                            onSubmit: (_) => _login(),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Remember + Forgot
-                          Row(children: [
-                            GestureDetector(
-                              onTap: () => setState(() => _remember = !_remember),
-                              child: Row(children: [
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
-                                  width: 18, height: 18,
-                                  decoration: BoxDecoration(
-                                    color: _remember ? p.gold : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(5),
-                                    border: Border.all(color: _remember ? p.gold : p.border, width: 1.5),
-                                  ),
-                                  child: _remember ? const Icon(Icons.check, size: 12, color: Colors.black87) : null,
-                                ),
-                                const SizedBox(width: 8),
-                                Text('Remember me', style: p.body(13.5, weight: FontWeight.w500)),
-                              ]),
-                            ),
-                            const Spacer(),
-                            MouseRegion(
-                              cursor: SystemMouseCursors.click,
-                              child: GestureDetector(
-                                onTap: _showForgotPassword,
-                                child: Text('Forgot Password?', style: p.body(13.5, color: p.gold, weight: FontWeight.w600)),
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: 32),
-
-                          // Login Button
-                          SizedBox(
-                            width: double.infinity,
-                            child: _loading
-                                ? Container(
-                                    height: 52,
-                                    decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(10)),
-                                    child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.black87, strokeWidth: 2.5))),
-                                  )
-                                : _LoginButton(label: 'SIGN IN', palette: p, onTap: _login),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Demo accounts
-                          Center(
-                            child: MouseRegion(
-                              cursor: SystemMouseCursors.click,
-                              child: GestureDetector(
-                                onTap: _showDemoAccounts,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                  decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(10), border: Border.all(color: p.border)),
-                                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                    Icon(Icons.manage_accounts_outlined, size: 17, color: p.gold),
-                                    const SizedBox(width: 8),
-                                    Text('View Demo Accounts', style: p.body(13.5, color: p.gold, weight: FontWeight.w600)),
-                                  ]),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-
-                          // Role pill list
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text('AVAILABLE ROLES', style: p.body(10.5, color: p.textMuted, weight: FontWeight.w700, spacing: 1.2)),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8, runSpacing: 8,
-                                children: [
-                                  UserRole.superAdmin, UserRole.owner, UserRole.branchManager,
-                                  UserRole.hr, UserRole.accountant, UserRole.inventoryManager,
-                                  UserRole.salesManager, UserRole.marketingManager,
-                                  UserRole.receptionist, UserRole.doctor, UserRole.nurse,
-                                ].map((r) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                  decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
-                                  child: Text(r.label, style: p.body(11.5, color: p.text, weight: FontWeight.w500)),
-                                )).toList(),
-                              ),
-                            ]),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) => constraints.maxWidth >= 900
+              ? _buildDesktop(p)
+              : _buildMobile(context, p),
         ),
       ),
+    );
+  }
+
+  // ── Desktop: two-column side-by-side ────────────────────────────────────────
+
+  Widget _buildDesktop(AppPalette p) {
+    return Row(children: [
+      Expanded(flex: 5, child: _buildHeroPanel(p)),
+      Expanded(flex: 4, child: _buildFormPanel(p)),
+    ]);
+  }
+
+  Widget _buildHeroPanel(AppPalette p) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0E0E12), Color(0xFF1A1500), Color(0xFF0E0E12)],
+          stops: [0.0, 0.5, 1.0],
+        ),
+      ),
+      child: Stack(children: [
+        CustomPaint(painter: _GridPainter(), child: const SizedBox.expand()),
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(52),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Logo — Flexible prevents overflow if panel narrows
+            Row(children: [
+              Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(14)),
+                child: const Icon(Icons.spa_outlined, color: Colors.black87, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('HAIR AGAIN', style: p.display(32, spacing: 2.0, color: const Color(0xFFC9A24B))),
+                Text('CLINIC ERP • KARACHI', style: p.body(11, color: const Color(0xFF9A9AA6), weight: FontWeight.w600, spacing: 2.0)),
+              ])),
+            ]),
+            const SizedBox(height: 48),
+            Text('Premium\nHair Care\nManagement', style: GoogleFonts.bebasNeue(fontSize: 68, color: Colors.white, letterSpacing: 1.5, height: 1.05)),
+            const SizedBox(height: 18),
+            Text('The complete ERP solution for modern\nhair transplant & care clinics.', style: p.body(15, color: const Color(0xFF9A9AA6))),
+            const SizedBox(height: 36),
+            // Stats — Wrap so bubbles reflow if panel ever narrows
+            Wrap(spacing: 24, runSpacing: 16, children: [
+              _StatBubble(value: '165+', label: 'Screens', palette: p),
+              _StatBubble(value: '22', label: 'Modules', palette: p),
+              _StatBubble(value: '100%', label: 'Secure', palette: p),
+            ]),
+            const SizedBox(height: 36),
+            // Feature bullets — Flexible on text so it wraps instead of overflowing
+            ...[
+              (Icons.group_outlined, 'Full CRM & Patient Journey Tracking'),
+              (Icons.point_of_sale_outlined, 'POS, Inventory & Billing'),
+              (Icons.people_outlined, 'HR, Payroll & Recruitment'),
+              (Icons.trending_up_outlined, 'Finance, Reports & Analytics'),
+            ].map((f) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFC9A24B).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)), child: Icon(f.$1, size: 17, color: const Color(0xFFC9A24B))),
+                const SizedBox(width: 14),
+                Flexible(child: Text(f.$2, style: p.body(14, color: Colors.white70, weight: FontWeight.w500))),
+              ]),
+            )),
+            const SizedBox(height: 32),
+            Text('© 2026 Hair Again Clinic ERP. All rights reserved.', style: p.body(11, color: const Color(0xFF9A9AA6))),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildFormPanel(AppPalette p) {
+    return Container(
+      color: p.sidebar,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 36),
+            child: _buildFormContent(p),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Mobile: single-column, full-width ───────────────────────────────────────
+
+  Widget _buildMobile(BuildContext context, AppPalette p) {
+    return Container(
+      color: p.sidebar,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _buildMobileHeader(p),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              child: _buildFormContent(p),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileHeader(AppPalette p) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0E0E12), Color(0xFF1A1500), Color(0xFF0E0E12)],
+          stops: [0.0, 0.5, 1.0],
+        ),
+      ),
+      child: Row(children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(10)),
+          child: const Icon(Icons.spa_outlined, color: Colors.black87, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('HAIR AGAIN', style: p.display(20, spacing: 1.5, color: const Color(0xFFC9A24B))),
+          Text('CLINIC ERP • KARACHI', style: p.body(10, color: const Color(0xFF9A9AA6), weight: FontWeight.w600, spacing: 1.5)),
+        ]),
+      ]),
+    );
+  }
+
+  // ── Shared form content (used by both desktop and mobile) ───────────────────
+
+  Widget _buildFormContent(AppPalette p) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Welcome Back', style: p.display(36, spacing: 0.5)),
+        const SizedBox(height: 6),
+        Text('Sign in to your account to continue', style: p.body(13.5, color: p.textMuted)),
+        const SizedBox(height: 28),
+
+        if (_error != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: p.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: p.danger.withValues(alpha: 0.35))),
+            child: Row(children: [
+              Icon(Icons.error_outline, color: p.danger, size: 17),
+              const SizedBox(width: 10),
+              Expanded(child: Text(_error!, style: p.body(12.5, color: p.danger))),
+            ]),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        _FieldLabel('Email Address', p),
+        const SizedBox(height: 7),
+        _LoginField(
+          controller: _emailCtrl, palette: p,
+          hint: 'admin@hairagain.pk',
+          prefix: Icons.email_outlined,
+          keyboardType: TextInputType.emailAddress,
+          onSubmit: (_) {},
+        ),
+        const SizedBox(height: 16),
+
+        _FieldLabel('Password', p),
+        const SizedBox(height: 7),
+        _LoginField(
+          controller: _passCtrl, palette: p,
+          hint: '••••••••',
+          prefix: Icons.lock_outline,
+          obscure: _obscure,
+          suffixIcon: GestureDetector(
+            onTap: () => setState(() => _obscure = !_obscure),
+            child: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18, color: p.textMuted),
+          ),
+          onSubmit: (_) => _login(),
+        ),
+        const SizedBox(height: 14),
+
+        Row(children: [
+          GestureDetector(
+            onTap: () => setState(() => _remember = !_remember),
+            child: Row(children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 18, height: 18,
+                decoration: BoxDecoration(
+                  color: _remember ? p.gold : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: _remember ? p.gold : p.border, width: 1.5),
+                ),
+                child: _remember ? const Icon(Icons.check, size: 12, color: Colors.black87) : null,
+              ),
+              const SizedBox(width: 8),
+              Text('Remember me', style: p.body(13, weight: FontWeight.w500)),
+            ]),
+          ),
+          const Spacer(),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _showForgotPassword,
+              child: Text('Forgot Password?', style: p.body(13, color: p.gold, weight: FontWeight.w600)),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 24),
+
+        SizedBox(
+          width: double.infinity,
+          child: _loading
+              ? Container(
+                  height: 50,
+                  decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(6)),
+                  child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.black87, strokeWidth: 2.5))),
+                )
+              : _LoginButton(label: 'SIGN IN', palette: p, onTap: _login),
+        ),
+        const SizedBox(height: 16),
+
+        Center(
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _showDemoAccounts,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.border)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.manage_accounts_outlined, size: 17, color: p.gold),
+                  const SizedBox(width: 8),
+                  Text('View Demo Accounts', style: p.body(13, color: p.gold, weight: FontWeight.w600)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 28),
+
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.border)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('AVAILABLE ROLES', style: p.body(10, color: p.textMuted, weight: FontWeight.w700, spacing: 1.2)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6, runSpacing: 6,
+              children: [
+                UserRole.superAdmin, UserRole.owner, UserRole.branchManager,
+                UserRole.hr, UserRole.accountant, UserRole.inventoryManager,
+                UserRole.salesManager, UserRole.marketingManager,
+                UserRole.receptionist, UserRole.doctor, UserRole.nurse,
+              ].map((r) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(4), border: Border.all(color: p.border)),
+                child: Text(r.label, style: p.body(11, color: p.text, weight: FontWeight.w500)),
+              )).toList(),
+            ),
+          ]),
+        ),
+      ],
     );
   }
 }
@@ -824,6 +880,88 @@ class _PasswordStrengthBarState extends State<_PasswordStrengthBar> {
       const SizedBox(width: 10),
       Text(label, style: p.body(11.5, color: color, weight: FontWeight.w600)),
     ]);
+  }
+}
+
+// ── MFA OTP Dialog ────────────────────────────────────────────────────────────
+class _MfaDialog extends StatefulWidget {
+  final AppUser user;
+  const _MfaDialog({required this.user});
+  @override
+  State<_MfaDialog> createState() => _MfaDialogState();
+}
+
+class _MfaDialogState extends State<_MfaDialog> {
+  final _digits = List.generate(6, (_) => TextEditingController());
+  final _foci   = List.generate(6, (_) => FocusNode());
+  bool _loading = false;
+  String? _err;
+
+  @override
+  void dispose() {
+    for (final c in _digits) c.dispose();
+    for (final f in _foci) f.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verify() async {
+    final code = _digits.map((c) => c.text).join();
+    if (code.length < 6) { setState(() => _err = 'Please enter all 6 digits'); return; }
+    setState(() { _loading = true; _err = null; });
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    
+    // For demo, accept any 6-digit code
+    Navigator.pop(context);
+    appState.login(widget.user);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = appState.palette;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: 460, padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _AuthDialogHeader(p: p, icon: Icons.shield_outlined, title: 'TWO-FACTOR AUTHENTICATION', subtitle: 'Enter the 6-digit code sent to ${widget.user.phone}', onClose: () => Navigator.pop(context)),
+          const SizedBox(height: 28),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(6, (i) => Container(
+            width: 52, height: 60, margin: const EdgeInsets.symmetric(horizontal: 5),
+            decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(10), border: Border.all(color: p.border)),
+            child: TextField(
+              controller: _digits[i], focusNode: _foci[i],
+              textAlign: TextAlign.center, maxLength: 1,
+              keyboardType: TextInputType.number,
+              style: p.body(22, weight: FontWeight.w700), cursorColor: p.gold,
+              decoration: const InputDecoration(border: InputBorder.none, counterText: '', isCollapsed: true, contentPadding: EdgeInsets.symmetric(vertical: 16)),
+              onChanged: (v) {
+                if (v.length == 1 && i < 5) FocusScope.of(context).requestFocus(_foci[i + 1]);
+                if (v.isEmpty && i > 0) FocusScope.of(context).requestFocus(_foci[i - 1]);
+                setState(() => _err = null);
+              },
+            ),
+          ))),
+          if (_err != null) ...[const SizedBox(height: 10), _AuthError(p: p, message: _err!)],
+          const SizedBox(height: 8),
+          Center(child: TextButton(
+            onPressed: () {
+              toast(context, 'Code resent to ${widget.user.phone}');
+              for (final d in _digits) d.clear();
+              _foci.first.requestFocus();
+            },
+            child: Text("Didn't receive it? Resend Code", style: p.body(12.5, color: p.gold, weight: FontWeight.w600)),
+          )),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: _AuthOutlineBtn(label: 'Cancel', p: p, onTap: () => Navigator.pop(context))),
+            const SizedBox(width: 12),
+            Expanded(child: _loading ? _AuthLoadingBtn(p: p) : _AuthSolidBtn(label: 'Verify & Login', p: p, onTap: _verify)),
+          ]),
+        ]),
+      ),
+    );
   }
 }
 

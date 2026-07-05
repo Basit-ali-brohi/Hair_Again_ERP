@@ -65,6 +65,7 @@ class AppUser {
   bool isActive;
   final DateTime createdAt;
   DateTime? lastLogin;
+  bool mfaEnabled;
 
   AppUser({
     required this.id,
@@ -78,6 +79,7 @@ class AppUser {
     this.isActive = true,
     required this.createdAt,
     this.lastLogin,
+    this.mfaEnabled = false,
   });
 
   String get initials {
@@ -150,59 +152,69 @@ final List<AppUser> demoUsers = [
     role: UserRole.superAdmin, branch: 'Clifton Branch',
     department: 'Administration', createdAt: DateTime(2024, 1, 1),
     lastLogin: DateTime.now().subtract(const Duration(hours: 2)),
+    mfaEnabled: true,
   ),
   AppUser(
     id: 'U-002', name: 'Tariq Mahmood', email: 'owner@hairagain.pk',
     password: 'Owner@123', phone: '+92 300 0000002',
     role: UserRole.owner, branch: 'Clifton Branch',
     department: 'Management', createdAt: DateTime(2024, 1, 1),
+    mfaEnabled: false,
   ),
   AppUser(
     id: 'U-003', name: 'Nadia Aslam', email: 'manager@hairagain.pk',
     password: 'Mgr@123', phone: '+92 311 5556667',
     role: UserRole.branchManager, branch: 'Clifton Branch',
     department: 'Operations', createdAt: DateTime(2024, 3, 15),
+    mfaEnabled: false,
   ),
   AppUser(
     id: 'U-004', name: 'Zara Khan', email: 'hr@hairagain.pk',
     password: 'Hr@123', phone: '+92 300 0000004',
     role: UserRole.hr, branch: 'Clifton Branch',
     department: 'Human Resources', createdAt: DateTime(2024, 2, 1),
+    mfaEnabled: false,
   ),
   AppUser(
     id: 'U-005', name: 'Kamran Ali', email: 'accounts@hairagain.pk',
     password: 'Acct@123', phone: '+92 300 0000005',
     role: UserRole.accountant, branch: 'Clifton Branch',
     department: 'Finance', createdAt: DateTime(2024, 2, 1),
+    mfaEnabled: false,
   ),
   AppUser(
     id: 'U-006', name: 'Fahad Mirza', email: 'inventory@hairagain.pk',
     password: 'Inv@123', phone: '+92 300 0000006',
     role: UserRole.inventoryManager, branch: 'Clifton Branch',
     department: 'Operations', createdAt: DateTime(2024, 4, 1),
+    mfaEnabled: false,
   ),
   AppUser(
     id: 'U-007', name: 'Sara Ahmed', email: 'sales@hairagain.pk',
     password: 'Sales@123', phone: '+92 300 0000007',
     role: UserRole.salesManager, branch: 'Clifton Branch',
     department: 'Sales', createdAt: DateTime(2024, 3, 1),
+    mfaEnabled: false,
   ),
   AppUser(
     id: 'U-008', name: 'Ali Raza', email: 'reception@hairagain.pk',
     password: 'Rec@123', phone: '+92 345 9876543',
     role: UserRole.receptionist, branch: 'Clifton Branch',
     department: 'Front Desk', createdAt: DateTime(2024, 1, 15),
+    mfaEnabled: false,
   ),
   AppUser(
     id: 'U-009', name: 'Dr. Rehman', email: 'doctor@hairagain.pk',
     password: 'Doc@123', phone: '+92 300 1112223',
     role: UserRole.doctor, branch: 'Clifton Branch',
     department: 'Medical', createdAt: DateTime(2024, 1, 1),
+    mfaEnabled: false,
   ),
   AppUser(
     id: 'U-010', name: 'Hira Saleem', email: 'nurse@hairagain.pk',
     password: 'Nurse@123', phone: '+92 333 1234567',
     role: UserRole.nurse, branch: 'Clifton Branch',
     department: 'Medical', createdAt: DateTime(2024, 1, 1),
+    mfaEnabled: false,
   ),
 ];

@@ -42,8 +42,8 @@ class AppState extends ChangeNotifier {
   }
 
   // ── Theme / Accent ──────────────────────────────────────────────────────────
-  bool isDark = StorageService.getBool('isDark', false);
-  int accentIndex = StorageService.getInt('accentIndex', 1);
+  bool isDark = StorageService.getBool('isDark', true);
+  int accentIndex = StorageService.getInt('accentIndex', 0);
 
   static const List<({String name, Color color})> accents = [
     (name: 'Brushed Gold', color: Color(0xFFC9A24B)),
@@ -58,6 +58,10 @@ class AppState extends ChangeNotifier {
 
   void toggleTheme() { isDark = !isDark; StorageService.setBool('isDark', isDark); notifyListeners(); }
   void setAccent(int i) { accentIndex = i; StorageService.setInt('accentIndex', i); notifyListeners(); }
+
+  // ── Splash ──────────────────────────────────────────────────────────────────
+  bool splashDone = false;
+  void splashComplete() { splashDone = true; notifyListeners(); }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   AppUser? currentUser;

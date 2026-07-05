@@ -12,7 +12,7 @@ class FinanceScreen extends StatefulWidget {
 class _FinanceScreenState extends State<FinanceScreen> with SingleTickerProviderStateMixin {
   late final TabController _tab;
   @override
-  void initState() { super.initState(); _tab = TabController(length: 6, vsync: this); }
+  void initState() { super.initState(); _tab = TabController(length: 7, vsync: this); }
   @override
   void dispose() { _tab.dispose(); super.dispose(); }
 
@@ -23,6 +23,9 @@ class _FinanceScreenState extends State<FinanceScreen> with SingleTickerProvider
       title: 'FINANCE & ACCOUNTS',
       subtitle: 'Income, expenses, cash book, bank accounts & journal entries',
       actions: [
+        GhostButton(label: 'Export PDF', icon: Icons.picture_as_pdf_outlined, onTap: () => showPdfPreview(context, title: 'Finance Report', build: () => buildReportPdf())),
+      ],
+      child: Column(children: [
         Container(
           height: 42,
           decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
@@ -35,14 +38,17 @@ class _FinanceScreenState extends State<FinanceScreen> with SingleTickerProvider
             tabAlignment: TabAlignment.start,
             tabs: const [
               Tab(text: 'Dashboard'), Tab(text: 'Income'), Tab(text: 'Expenses'),
-              Tab(text: 'Cash Book'), Tab(text: 'Bank Accounts'), Tab(text: 'Journal Entries'),
+              Tab(text: 'Cash Book'), Tab(text: 'Bank Accounts'), Tab(text: 'Journal Entries'), Tab(text: 'Transactions'),
             ],
           ),
         ),
-      ],
-      child: TabBarView(controller: _tab, children: const [
-        _DashboardTab(), _IncomeTab(), _ExpensesTab(),
-        _CashBookTab(), _BankTab(), _JournalTab(),
+        const SizedBox(height: 12),
+        Expanded(
+          child: EagerTabBarView(controller: _tab, children: const [
+            _DashboardTab(), _IncomeTab(), _ExpensesTab(),
+            _CashBookTab(), _BankTab(), _JournalTab(), _TransactionsTab(),
+          ]),
+        ),
       ]),
     );
   }
@@ -285,6 +291,7 @@ class _IncomeTabState extends State<_IncomeTab> {
       ),
       const SizedBox(height: 12),
       Expanded(child: Panel(padding: EdgeInsets.zero, child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: FullWidthDataTable(child: DataTable(
+        key: ValueKey(list.length),
         headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
         columnSpacing: 16, horizontalMargin: 20,
         columns: [
@@ -446,6 +453,7 @@ class _ExpensesTabState extends State<_ExpensesTab> {
       ])),
       const SizedBox(height: 12),
       Expanded(child: Panel(padding: EdgeInsets.zero, child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: FullWidthDataTable(child: DataTable(
+        key: ValueKey(list.length),
         headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
         columnSpacing: 16, horizontalMargin: 20,
         columns: [
@@ -481,42 +489,141 @@ class _ExpensesTabState extends State<_ExpensesTab> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CASH BOOK TAB
+// CASH BOOK TAB  (enhanced — Add Entry + date-range filter)
 // ══════════════════════════════════════════════════════════════════════════════
-class _CashBookTab extends StatelessWidget {
+class _CashBookTab extends StatefulWidget {
   const _CashBookTab();
+  @override
+  State<_CashBookTab> createState() => _CashBookTabState();
+}
+
+class _CashBookTabState extends State<_CashBookTab> {
+  String _range = 'This Month'; // This Month / Last Month / All Time
+  // Local extra entries added via "Add Entry" — merged with appState seed
+  final _local = <CashBookEntry>[];
+
+  static const _categories = ['Sales', 'Salaries', 'Rent', 'Utilities', 'Supplies', 'Miscellaneous'];
+
+  List<CashBookEntry> get _all {
+    final combined = [...appState.cashBookEntries, ..._local];
+    combined.sort((a, b) => b.date.compareTo(a.date));
+    final now = DateTime.now();
+    return combined.where((e) {
+      if (_range == 'This Month') return e.date.month == now.month && e.date.year == now.year;
+      if (_range == 'Last Month') { final lm = DateTime(now.year, now.month - 1); return e.date.month == lm.month && e.date.year == lm.year; }
+      return true;
+    }).toList();
+  }
+
+  void _addEntry() {
+    final p = appState.palette;
+    final descCtrl = TextEditingController();
+    final amtCtrl = TextEditingController();
+    final partyCtrl = TextEditingController();
+    String type = 'receipt';
+    String category = 'Sales';
+    DateTime date = DateTime.now();
+
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(width: 520, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('ADD CASH BOOK ENTRY', style: p.display(22, spacing: 1.0)),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: Dropdown2<String>(label: 'Type', value: type,
+              items: [DropdownMenuItem(value: 'receipt', child: Text('Credit (Receipt)')), DropdownMenuItem(value: 'payment', child: Text('Debit (Payment)'))],
+              onChanged: (v) => ss(() => type = v ?? type))),
+            const SizedBox(width: 14),
+            Expanded(child: FormField2(label: 'Amount (PKR) *', controller: amtCtrl, hint: '0.00', keyboard: TextInputType.number)),
+          ]),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: FormField2(label: 'Description *', controller: descCtrl, hint: 'Details of transaction')),
+            const SizedBox(width: 14),
+            Expanded(child: Dropdown2<String>(label: 'Category', value: category,
+              items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              onChanged: (v) => ss(() => category = v ?? category))),
+          ]),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: FormField2(label: 'Party / Description', controller: partyCtrl, hint: 'Person or company name')),
+            const SizedBox(width: 14),
+            Expanded(child: _DatePicker(label: 'Date', value: date, palette: p, onPick: (d) => ss(() => date = d))),
+          ]),
+          const SizedBox(height: 24),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
+            const SizedBox(width: 12),
+            GoldButton(label: 'Add Entry', onTap: () {
+              final amt = double.tryParse(amtCtrl.text);
+              if (amt == null || descCtrl.text.isEmpty) return;
+              final prevBal = _all.isEmpty ? appState.cashBalance : _all.first.runningBalance;
+              final newBal = type == 'receipt' ? prevBal + amt : prevBal - amt;
+              setState(() => _local.add(CashBookEntry(
+                id: 'CB-L-${_local.length + 1}', date: date, type: type, amount: amt,
+                description: descCtrl.text, party: partyCtrl.text.isEmpty ? null : partyCtrl.text,
+                referenceNo: category, runningBalance: newBal,
+              )));
+              Navigator.pop(ctx);
+              toast(context, 'Cash book entry added');
+            }),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = pal(context);
-    final entries = appState.cashBookEntries;
+    final entries = _all;
+    final receipts = entries.where((e) => e.type == 'receipt').fold(0.0, (s, e) => s + e.amount);
+    final payments = entries.where((e) => e.type == 'payment').fold(0.0, (s, e) => s + e.amount);
+    final opening = entries.isEmpty ? 0.0 : (entries.last.runningBalance - entries.last.amount * (entries.last.type == 'receipt' ? 1 : -1));
+    final closing = entries.isEmpty ? 0.0 : entries.first.runningBalance;
+
     return Column(children: [
+      Row(children: [
+        SizedBox(
+          width: 160,
+          child: Dropdown2<String>(label: '', value: _range,
+            items: ['This Month', 'Last Month', 'All Time'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+            onChanged: (v) => setState(() => _range = v ?? _range)),
+        ),
+        const Spacer(),
+        GoldButton(label: 'Add Entry', icon: Icons.add, onTap: _addEntry),
+      ]),
+      const SizedBox(height: 12),
       Panel(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14), child: Row(children: [
-        _CashStat('Opening Balance', entries.isEmpty ? 0 : entries.last.runningBalance - entries.last.amount * (entries.last.type == 'receipt' ? 1 : -1), p.textMuted, p),
+        _CashStat('Opening Balance', opening, p.textMuted, p),
         _Divider(p),
-        _CashStat('Total Receipts', entries.where((e) => e.type == 'receipt').fold(0.0, (s, e) => s + e.amount), p.success, p),
+        _CashStat('Total Receipts', receipts, p.success, p),
         _Divider(p),
-        _CashStat('Total Payments', entries.where((e) => e.type == 'payment').fold(0.0, (s, e) => s + e.amount), p.danger, p),
+        _CashStat('Total Payments', payments, p.danger, p),
         _Divider(p),
-        _CashStat('Closing Balance', entries.isEmpty ? 0 : entries.first.runningBalance, p.gold, p),
+        _CashStat('Closing Balance', closing, p.gold, p),
       ])),
       const SizedBox(height: 12),
       Expanded(child: Panel(padding: EdgeInsets.zero, child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: FullWidthDataTable(child: DataTable(
+        key: ValueKey(entries.length),
         headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
         columnSpacing: 20, horizontalMargin: 20,
         columns: [
           DataColumn(label: Text('Date', style: p.body(12, weight: FontWeight.w700))),
           DataColumn(label: Text('Description', style: p.body(12, weight: FontWeight.w700))),
+          DataColumn(label: Text('Type', style: p.body(12, weight: FontWeight.w700))),
           DataColumn(label: Text('Party', style: p.body(12, weight: FontWeight.w700))),
-          DataColumn(numeric: true, label: Text('Receipts', style: p.body(12, weight: FontWeight.w700))),
-          DataColumn(numeric: true, label: Text('Payments', style: p.body(12, weight: FontWeight.w700))),
+          DataColumn(numeric: true, label: Text('Amount', style: p.body(12, weight: FontWeight.w700))),
           DataColumn(numeric: true, label: Text('Balance', style: p.body(12, weight: FontWeight.w700))),
         ],
         rows: entries.map((e) => DataRow(cells: [
           DataCell(Text(prettyShort(e.date), style: p.body(12.5))),
           DataCell(Text(e.description, style: p.body(12.5))),
+          DataCell(StatusChip(label: e.type == 'receipt' ? 'Credit' : 'Debit', color: e.type == 'receipt' ? p.success : p.danger)),
           DataCell(Text(e.party ?? '—', style: p.body(12.5, color: p.textMuted))),
-          DataCell(Text(e.type == 'receipt' ? money(e.amount) : '—', style: p.body(13, color: p.success, weight: FontWeight.w600))),
-          DataCell(Text(e.type == 'payment' ? money(e.amount) : '—', style: p.body(13, color: p.danger, weight: FontWeight.w600))),
+          DataCell(Text(money(e.amount), style: p.body(13, color: e.type == 'receipt' ? p.success : p.danger, weight: FontWeight.w600))),
           DataCell(Text(money(e.runningBalance), style: p.body(13.5, color: p.gold, weight: FontWeight.w700))),
         ])).toList(),
       ))))))
@@ -532,8 +639,18 @@ Widget _CashStat(String label, double value, Color color, AppPalette p) => Expan
 Widget _Divider(AppPalette p) => Container(width: 1, height: 40, margin: const EdgeInsets.symmetric(horizontal: 20), color: p.border);
 
 // ══════════════════════════════════════════════════════════════════════════════
-// BANK ACCOUNTS TAB
+// BANK ACCOUNTS TAB  (enhanced — Reconcile + Add Transaction per account)
 // ══════════════════════════════════════════════════════════════════════════════
+
+// Local transaction entry (stored per bank tab session)
+class _BankTxn {
+  final String bankId, type, reference, notes;
+  final double amount;
+  final DateTime date;
+  bool reconciled;
+  _BankTxn({required this.bankId, required this.type, required this.amount, required this.date, required this.reference, this.notes = '', this.reconciled = false});
+}
+
 class _BankTab extends StatefulWidget {
   const _BankTab();
   @override
@@ -541,6 +658,13 @@ class _BankTab extends StatefulWidget {
 }
 
 class _BankTabState extends State<_BankTab> {
+  // Local transactions added in this session
+  final _txns = <_BankTxn>[
+    _BankTxn(bankId: 'BA-1', type: 'Deposit', amount: 150000, date: DateTime(2026, 7, 1), reference: 'REF-001', notes: 'Patient payment batch'),
+    _BankTxn(bankId: 'BA-1', type: 'Withdrawal', amount: 45000, date: DateTime(2026, 6, 30), reference: 'REF-002', notes: 'Supplier payment'),
+    _BankTxn(bankId: 'BA-2', type: 'Deposit', amount: 220000, date: DateTime(2026, 6, 28), reference: 'PAY-55', notes: 'Salary credit', reconciled: true),
+  ];
+
   void _addAccount() {
     final p = appState.palette;
     final bankCtrl = TextEditingController();
@@ -590,41 +714,139 @@ class _BankTabState extends State<_BankTab> {
     ));
   }
 
+  void _reconcile(BankAccount ba) {
+    final p = appState.palette;
+    final acctTxns = _txns.where((t) => t.bankId == ba.id).toList();
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(width: 600, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('RECONCILE — ${ba.bankName}', style: p.display(22, spacing: 1.0)),
+          const SizedBox(height: 6),
+          Text('Check each transaction that appears on your bank statement.', style: p.body(12.5, color: p.textMuted)),
+          const SizedBox(height: 18),
+          acctTxns.isEmpty
+            ? Padding(padding: const EdgeInsets.all(20), child: Center(child: Text('No transactions for this account.', style: p.body(13, color: p.textMuted))))
+            : Column(children: acctTxns.map((t) => CheckboxListTile(
+                value: t.reconciled, activeColor: p.gold,
+                title: Text('${prettyShort(t.date)} — ${t.type}  |  ${money(t.amount)}', style: p.body(13)),
+                subtitle: Text('${t.reference}  ${t.notes}', style: p.body(11.5, color: p.textMuted)),
+                onChanged: (v) { ss(() => t.reconciled = v ?? false); setState(() {}); },
+              )).toList()),
+          const SizedBox(height: 16),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            Text('${acctTxns.where((t) => t.reconciled).length}/${acctTxns.length} reconciled', style: p.body(12.5, color: p.textMuted)),
+            const Spacer(),
+            GhostButton(label: 'Done', onTap: () => Navigator.pop(ctx)),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
+  void _addTransaction(BankAccount ba) {
+    final p = appState.palette;
+    final amtCtrl = TextEditingController();
+    final refCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    String type = 'Deposit';
+    DateTime date = DateTime.now();
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(width: 500, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('ADD TRANSACTION — ${ba.bankName}', style: p.display(20, spacing: 0.5)),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: Dropdown2<String>(label: 'Type', value: type,
+              items: ['Deposit', 'Withdrawal', 'Transfer'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+              onChanged: (v) => ss(() => type = v ?? type))),
+            const SizedBox(width: 14),
+            Expanded(child: FormField2(label: 'Amount (PKR) *', controller: amtCtrl, hint: '0.00', keyboard: TextInputType.number)),
+          ]),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: FormField2(label: 'Reference No.', controller: refCtrl, hint: 'Cheque / TRN no.')),
+            const SizedBox(width: 14),
+            Expanded(child: _DatePicker(label: 'Date', value: date, palette: p, onPick: (d) => ss(() => date = d))),
+          ]),
+          const SizedBox(height: 14),
+          FormField2(label: 'Notes', controller: notesCtrl, hint: 'Transaction details…', maxLines: 2),
+          const SizedBox(height: 24),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
+            const SizedBox(width: 12),
+            GoldButton(label: 'Add Transaction', onTap: () {
+              final amt = double.tryParse(amtCtrl.text);
+              if (amt == null) return;
+              setState(() {
+                _txns.insert(0, _BankTxn(bankId: ba.id, type: type, amount: amt, date: date, reference: refCtrl.text, notes: notesCtrl.text));
+                if (type == 'Deposit') ba.currentBalance += amt;
+                else if (type == 'Withdrawal') ba.currentBalance -= amt;
+              });
+              Navigator.pop(ctx);
+              toast(context, 'Transaction recorded');
+            }),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = pal(context);
+    final demoBanks = [
+      if (appState.bankAccounts.isEmpty) ...[
+        BankAccount(id: 'BA-1', bankName: 'HBL', accountTitle: 'Hair Again Main Account', accountNumber: 'XXXX-XXXX-1234', branchName: 'Clifton Branch', iban: 'PK36HABB0000001123456702', openingBalance: 500000, currentBalance: 642500, isPrimary: true),
+        BankAccount(id: 'BA-2', bankName: 'MCB', accountTitle: 'Hair Again Payroll Account', accountNumber: 'XXXX-XXXX-5678', branchName: 'DHA Branch', iban: 'PK74MUCB0002010098765014', openingBalance: 300000, currentBalance: 220000),
+      ],
+      ...appState.bankAccounts,
+    ];
     return Column(children: [
       Row(children: [const Spacer(), GoldButton(label: 'Add Bank Account', icon: Icons.add, onTap: _addAccount)]),
       const SizedBox(height: 12),
-      Expanded(child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: Wrap(spacing: 18, runSpacing: 18, children: appState.bankAccounts.map((ba) => SizedBox(width: 340, child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.account_balance_outlined, size: 22, color: p.gold)),
-          const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text(ba.bankName, style: p.body(15, weight: FontWeight.w700)),
-              if (ba.isPrimary) ...[const SizedBox(width: 8), StatusChip(label: 'Primary', color: p.gold)],
-            ]),
-            Text(ba.accountTitle, style: p.body(12.5, color: p.textMuted)),
-          ])),
-        ]),
-        const SizedBox(height: 16),
-        Text('CURRENT BALANCE', style: p.body(10.5, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)),
-        Text(money(ba.currentBalance), style: p.display(32, color: p.gold)),
-        const SizedBox(height: 16),
-        Divider(height: 1, color: p.border),
-        const SizedBox(height: 14),
-        _BankDetail('Account No.', ba.accountNumber, p),
-        _BankDetail('Branch', ba.branchName, p),
-        _BankDetail('IBAN', ba.iban, p),
-        _BankDetail('Opening Balance', money(ba.openingBalance), p),
-      ])))).toList())))),
+      Expanded(child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: Wrap(spacing: 18, runSpacing: 18, children: demoBanks.map((ba) {
+        final lastTxn = _txns.where((t) => t.bankId == ba.id).toList()..sort((a, b) => b.date.compareTo(a.date));
+        return SizedBox(width: 400, child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.account_balance_outlined, size: 22, color: p.gold)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(ba.bankName, style: p.body(15, weight: FontWeight.w700)),
+                if (ba.isPrimary) ...[const SizedBox(width: 8), StatusChip(label: 'Primary', color: p.gold)],
+              ]),
+              Text(ba.accountTitle, style: p.body(12.5, color: p.textMuted)),
+            ])),
+          ]),
+          const SizedBox(height: 16),
+          Text('CURRENT BALANCE', style: p.body(10.5, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)),
+          Text(money(ba.currentBalance), style: p.display(28, color: p.gold)),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: p.border),
+          const SizedBox(height: 14),
+          _BankDetail('Account No.', ba.accountNumber, p),
+          _BankDetail('Branch', ba.branchName, p),
+          _BankDetail('IBAN', ba.iban, p),
+          _BankDetail('Opening Balance', money(ba.openingBalance), p),
+          if (lastTxn.isNotEmpty) _BankDetail('Last Transaction', prettyShort(lastTxn.first.date), p),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: GhostButton(label: 'Reconcile', icon: Icons.checklist_outlined, dense: true, onTap: () => _reconcile(ba))),
+            const SizedBox(width: 10),
+            Expanded(child: GoldButton(label: 'Add Transaction', icon: Icons.add, dense: true, onTap: () => _addTransaction(ba))),
+          ]),
+        ])));
+      }).toList())))),
     ]);
   }
 }
 
 Widget _BankDetail(String label, String value, AppPalette p) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [
-  SizedBox(width: 130, child: Text(label, style: p.body(12, color: p.textMuted))),
+  SizedBox(width: 140, child: Text(label, style: p.body(12, color: p.textMuted))),
   Expanded(child: Text(value, style: p.body(12.5, weight: FontWeight.w600))),
 ]));
 
@@ -712,6 +934,12 @@ class _JournalTabState extends State<_JournalTab> {
           Row(mainAxisAlignment: MainAxisAlignment.end, children: [
             GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
             const SizedBox(width: 12),
+            GoldButton(label: 'Save Draft', onTap: () {
+              if (descCtrl.text.isEmpty) return;
+              appState.addJournalEntry(JournalEntry(id: 'JV-${appState.journalEntries.length + 1}', date: date, description: descCtrl.text, referenceNo: refCtrl.text.isEmpty ? null : refCtrl.text, voucherType: type, lines: lines, isPosted: false, createdBy: appState.currentUser?.name ?? 'System'));
+              Navigator.pop(ctx); setState(() {});
+            }),
+            const SizedBox(width: 8),
             GoldButton(label: 'Post Entry', onTap: () {
               if (descCtrl.text.isEmpty) return;
               appState.addJournalEntry(JournalEntry(id: 'JV-${appState.journalEntries.length + 1}', date: date, description: descCtrl.text, referenceNo: refCtrl.text.isEmpty ? null : refCtrl.text, voucherType: type, lines: lines, isPosted: true, createdBy: appState.currentUser?.name ?? 'System'));
@@ -750,6 +978,7 @@ class _JournalTabState extends State<_JournalTab> {
               StatusChip(label: je.isBalanced ? 'Balanced' : 'Unbalanced', color: je.isBalanced ? p.success : p.danger),
               const SizedBox(width: 10),
               StatusChip(label: je.isPosted ? 'Posted' : 'Draft', color: je.isPosted ? p.success : p.warning),
+              if (!je.isPosted) ...[const SizedBox(width: 10), GoldButton(label: 'Post', onTap: () => setState(() => je.isPosted = true))],
             ]),
             const SizedBox(height: 8),
             Text(je.description, style: p.body(13.5, weight: FontWeight.w600)),
@@ -788,4 +1017,74 @@ class _DatePicker extends StatelessWidget {
       ),
     ]);
   }
+}
+
+// ── Transactions ──────────────────────────────────────────────────────────────
+class _TransactionsTab extends StatefulWidget {
+  const _TransactionsTab();
+  @override
+  State<_TransactionsTab> createState() => _TransactionsTabState();
+}
+
+class _TransactionsTabState extends State<_TransactionsTab> {
+  String _typeFilter = 'All';
+  String _search = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final incomes = (_typeFilter == 'All' || _typeFilter == 'Income') ? appState.incomeEntries : <IncomeEntry>[];
+    final expenses = (_typeFilter == 'All' || _typeFilter == 'Expense') ? appState.expenseEntries : <ExpenseEntry>[];
+
+    final allRows = <_TxRow>[
+      ...incomes.map((e) => _TxRow(date: e.date, desc: e.description ?? e.category.name, category: e.category.name, type: 'Income', amount: e.amount, ref: e.referenceNo ?? '')),
+      ...expenses.map((e) => _TxRow(date: e.date, desc: e.description ?? e.category.name, category: e.category.name, type: 'Expense', amount: e.amount, ref: e.invoiceNo ?? '')),
+    ]..sort((a, b) => b.date.compareTo(a.date));
+
+    final filtered = _search.isEmpty ? allRows : allRows.where((r) => r.desc.toLowerCase().contains(_search.toLowerCase()) || r.category.toLowerCase().contains(_search.toLowerCase())).toList();
+
+    final totalCredits = filtered.where((r) => r.type == 'Income').fold(0.0, (s, r) => s + r.amount);
+    final totalDebits = filtered.where((r) => r.type == 'Expense').fold(0.0, (s, r) => s + r.amount);
+
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, padding: const EdgeInsets.only(right: 12, bottom: 28), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      MetricRow([
+        MetricCard(title: 'Total Transactions', value: '${filtered.length}', delta: '${filtered.length} entries', icon: Icons.swap_horiz_outlined),
+        MetricCard(title: 'Total Credits', value: money(totalCredits), delta: 'income total', icon: Icons.add_circle_outline),
+        MetricCard(title: 'Total Debits', value: money(totalDebits), delta: 'expense total', deltaUp: false, icon: Icons.remove_circle_outline),
+        MetricCard(title: 'Net Position', value: money(totalCredits - totalDebits), delta: 'net balance', deltaUp: totalCredits >= totalDebits, icon: Icons.account_balance_outlined),
+      ]),
+      const SizedBox(height: 18),
+      Row(children: [
+        Text('ALL TRANSACTIONS', style: p.display(18, spacing: 1.2)),
+        const Spacer(),
+        SizedBox(width: 180, child: FormField2(label: '', controller: TextEditingController(text: _search), hint: 'Search...', onChanged: (v) => setState(() => _search = v))),
+        const SizedBox(width: 12),
+        ...['All', 'Income', 'Expense'].map((t) => Padding(padding: const EdgeInsets.only(left: 6), child: GestureDetector(onTap: () => setState(() => _typeFilter = t), child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), decoration: BoxDecoration(color: _typeFilter == t ? p.gold.withValues(alpha: 0.15) : p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: _typeFilter == t ? p.gold : p.border)), child: Text(t, style: p.body(13, color: _typeFilter == t ? p.gold : p.textMuted, weight: FontWeight.w600)))))),
+      ]),
+      const SizedBox(height: 14),
+      if (filtered.isEmpty)
+        Center(child: Padding(padding: const EdgeInsets.all(40), child: Text('No transactions found.', style: p.body(14, color: p.textMuted)))),
+      if (filtered.isNotEmpty)
+        Panel(padding: EdgeInsets.zero, child: FullWidthDataTable(child: DataTable(
+          key: ValueKey(filtered.length),
+          columns: const [DataColumn(label: Text('Date')), DataColumn(label: Text('Description')), DataColumn(label: Text('Category')), DataColumn(label: Text('Type')), DataColumn(label: Text('Amount')), DataColumn(label: Text('Reference'))],
+          rows: filtered.map((r) {
+            final isIncome = r.type == 'Income';
+            return DataRow(cells: [
+              DataCell(Text(prettyShort(r.date), style: p.body(13))),
+              DataCell(SizedBox(width: 180, child: Text(r.desc, style: p.body(13, weight: FontWeight.w600), maxLines: 2, overflow: TextOverflow.ellipsis))),
+              DataCell(Text(r.category, style: p.body(13, color: p.textMuted))),
+              DataCell(StatusChip(label: r.type, color: isIncome ? p.success : p.danger)),
+              DataCell(Text(money(r.amount), style: p.body(13, weight: FontWeight.w700, color: isIncome ? p.success : p.danger))),
+              DataCell(Text(r.ref.isEmpty ? '—' : r.ref, style: p.body(12, color: p.textMuted))),
+            ]);
+          }).toList(),
+        ))),
+    ])));
+  }
+}
+
+class _TxRow {
+  final DateTime date; final String desc, category, type, ref; final double amount;
+  _TxRow({required this.date, required this.desc, required this.category, required this.type, required this.amount, required this.ref});
 }

@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local run logs
+run*.txt
+run*_err.txt
+run*_log.txt
+
+# Flutter metadata
+.metadata

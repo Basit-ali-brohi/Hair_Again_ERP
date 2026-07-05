@@ -12,7 +12,7 @@ class HrScreen extends StatefulWidget {
 class _HrScreenState extends State<HrScreen> with SingleTickerProviderStateMixin {
   late final TabController _tab;
   @override
-  void initState() { super.initState(); _tab = TabController(length: 7, vsync: this); }
+  void initState() { super.initState(); _tab = TabController(length: 8, vsync: this); }
   @override
   void dispose() { _tab.dispose(); super.dispose(); }
 
@@ -36,12 +36,12 @@ class _HrScreenState extends State<HrScreen> with SingleTickerProviderStateMixin
             tabs: const [
               Tab(text: 'Overview'), Tab(text: 'Attendance'), Tab(text: 'Leave'),
               Tab(text: 'Payroll'), Tab(text: 'Salary Structure'),
-              Tab(text: 'Shifts'), Tab(text: 'Recruitment'),
+              Tab(text: 'Shifts'), Tab(text: 'Recruitment'), Tab(text: 'Payslips'),
             ],
           ),
         ),
       ],
-      child: TabBarView(
+      child: EagerTabBarView(
         controller: _tab,
         children: [
           _OverviewTab(onGoToTab: (i) => _tab.animateTo(i)),
@@ -51,6 +51,7 @@ class _HrScreenState extends State<HrScreen> with SingleTickerProviderStateMixin
           const _SalaryStructureTab(),
           const _ShiftsTab(),
           const _RecruitmentTab(),
+          const _PayslipsTab(),
         ],
       ),
     );
@@ -517,14 +518,16 @@ class _PayrollTabState extends State<_PayrollTab> {
     final p = pal(context);
     return Column(children: [
       Panel(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), child: Row(children: [
-        Dropdown2<int>(label: '', value: _month, items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text(_months[i]))).toList(), onChanged: (v) => setState(() => _month = v ?? _month)),
+        FilterDropdown<int>(value: _month, items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text(_months[i]))).toList(), onChanged: (v) => setState(() => _month = v ?? _month)),
         const SizedBox(width: 12),
-        Dropdown2<int>(label: '', value: _year, items: [2024,2025,2026].map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(), onChanged: (v) => setState(() => _year = v ?? _year)),
+        FilterDropdown<int>(value: _year, items: [2024,2025,2026].map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(), onChanged: (v) => setState(() => _year = v ?? _year)),
         const Spacer(),
         if (!_hasRecords) GoldButton(label: 'Process ${_months[_month-1]} Payroll', icon: Icons.play_arrow_outlined, onTap: () { appState.processPayroll(_month, _year); setState(() {}); }),
         if (_hasRecords) ...[
           Text('Total: ${money(_records.fold(0.0, (s, r) => s + r.netSalary))}', style: p.display(22, spacing: 0.5, color: p.gold)),
           const SizedBox(width: 16),
+          GhostButton(label: 'Export PDF', icon: Icons.picture_as_pdf_outlined, onTap: () => showPdfPreview(context, title: 'Payroll — ${_months[_month - 1]} $_year', build: () => buildPayrollPdf(_records, monthLabel: '${_months[_month - 1]} $_year'))),
+          const SizedBox(width: 8),
           GhostButton(label: 'Mark All Paid', icon: Icons.payments_outlined, onTap: () { for (final r in _records) r.status = PayrollStatus.paid; setState(() {}); }),
         ],
       ])),
@@ -1092,4 +1095,77 @@ class _DatePickerField extends StatelessWidget {
       ),
     ]);
   }
+}
+
+// ── Payslips ──────────────────────────────────────────────────────────────────
+class _PayslipsTab extends StatefulWidget {
+  const _PayslipsTab();
+  @override
+  State<_PayslipsTab> createState() => _PayslipsTabState();
+}
+
+class _PayslipsTabState extends State<_PayslipsTab> {
+  String _selectedMonth = 'Jul 2026';
+  String? _selectedStaff;
+
+  static const _months = ['Jul 2026', 'Jun 2026', 'May 2026', 'Apr 2026', 'Mar 2026', 'Feb 2026', 'Jan 2026'];
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final payrolls = appState.payrollRecords.where((pr) {
+      final monthMatch = _selectedMonth.isEmpty || '${_monthName(pr.month)} ${pr.year}' == _selectedMonth;
+      final staffMatch = _selectedStaff == null || _selectedStaff!.isEmpty || pr.employeeName == _selectedStaff;
+      return monthMatch && staffMatch;
+    }).toList();
+
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, padding: const EdgeInsets.only(right: 12, bottom: 28), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      MetricRow([
+        MetricCard(title: 'Payslips This Month', value: '${payrolls.length}', delta: '${payrolls.length} records', icon: Icons.receipt_long_outlined),
+        MetricCard(title: 'Total Gross', value: money(payrolls.fold(0.0, (s, r) => s + r.grossSalary)), delta: 'gross salary', icon: Icons.payments_outlined),
+        MetricCard(title: 'Total Deductions', value: money(payrolls.fold(0.0, (s, r) => s + r.deductions)), delta: 'deducted', deltaUp: false, icon: Icons.remove_circle_outline),
+        MetricCard(title: 'Total Net Pay', value: money(payrolls.fold(0.0, (s, r) => s + r.netSalary)), delta: 'net payable', icon: Icons.account_balance_wallet_outlined),
+      ]),
+      const SizedBox(height: 18),
+      Row(children: [
+        Text('PAYSLIPS', style: p.display(18, spacing: 1.2)),
+        const Spacer(),
+        SizedBox(width: 180, child: Dropdown2<String>(label: 'Month', value: _selectedMonth, items: _months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (v) => setState(() => _selectedMonth = v ?? _selectedMonth))),
+        const SizedBox(width: 12),
+        SizedBox(width: 200, child: Dropdown2<String?>(label: 'Staff', value: _selectedStaff, items: [const DropdownMenuItem<String?>(value: null, child: Text('All Staff')), ...appState.staff.map((s) => DropdownMenuItem<String?>(value: s.name, child: Text(s.name, overflow: TextOverflow.ellipsis)))], onChanged: (v) => setState(() => _selectedStaff = v))),
+      ]),
+      const SizedBox(height: 14),
+      if (payrolls.isEmpty)
+        Center(child: Padding(padding: const EdgeInsets.all(40), child: Text('No payslips for selected period.', style: p.body(14, color: p.textMuted)))),
+      ...payrolls.map((pr) => Padding(padding: const EdgeInsets.only(bottom: 14), child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 40, height: 40, decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), shape: BoxShape.circle), child: Center(child: Text(pr.employeeName.isNotEmpty ? pr.employeeName[0] : '?', style: p.body(16, weight: FontWeight.w700, color: p.gold)))),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(pr.employeeName, style: p.body(14, weight: FontWeight.w700)),
+            Text('${_monthName(pr.month)} ${pr.year}', style: p.body(12, color: p.textMuted)),
+          ])),
+          StatusChip(label: pr.status.label, color: pr.status == PayrollStatus.paid ? p.success : pr.status == PayrollStatus.processed ? p.info : p.warning),
+          const SizedBox(width: 12),
+          GhostButton(label: 'Print Payslip', icon: Icons.print_outlined, onTap: () => toast(context, 'Printing payslip for ${pr.employeeName}')),
+        ]),
+        const Divider(height: 20),
+        Row(children: [
+          _payRow(p, 'Basic Salary', money(pr.basicSalary)),
+          _payRow(p, 'Allowances', money(pr.allowances)),
+          _payRow(p, 'Overtime', money(pr.overtime)),
+          _payRow(p, 'Deductions', money(pr.deductions), color: p.danger),
+          _payRow(p, 'Net Pay', money(pr.netSalary), color: p.gold, bold: true),
+        ]),
+      ])))),
+    ])));
+  }
+
+  Widget _payRow(AppPalette p, String label, String value, {Color? color, bool bold = false}) => Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(label, style: p.body(11, color: p.textMuted)),
+    const SizedBox(height: 4),
+    Text(value, style: p.body(13, weight: bold ? FontWeight.w700 : FontWeight.w500, color: color ?? p.text)),
+  ]));
+
+  String _monthName(int m) => const ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m];
 }

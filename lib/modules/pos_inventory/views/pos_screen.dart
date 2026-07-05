@@ -1,6 +1,6 @@
 // modules/pos_inventory/views — billing checkout + cart + split payment, the
-// printable thermal-style receipt modal, and inventory table with stock
-// steppers and low-stock markers.
+// printable thermal-style receipt modal, inventory table with stock
+// steppers and low-stock markers, plus refund / exchange / hold / EOD tabs.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,6 +9,16 @@ import '../models/pos_models.dart';
 import '../../crm/models/patient.dart';
 import '../../appointments/models/appointment.dart';
 
+// ── Hold Sale model ──────────────────────────────────────────────────────────
+class _HeldSale {
+  final String id;
+  final String patientName;
+  final List<InvoiceLine> items;
+  final double total;
+  final DateTime heldAt;
+  _HeldSale({required this.id, required this.patientName, required this.items, required this.total, required this.heldAt});
+}
+
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
   @override
@@ -16,11 +26,10 @@ class PosScreen extends StatefulWidget {
 }
 
 enum _StockFilter { all, inStock, low }
-
 enum _InvSort { nameAz, priceHi, stockLo }
 
-class PosScreenState extends State<PosScreen> {
-  int _tab = 0;
+class PosScreenState extends State<PosScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tab;
   _StockFilter _stockFilter = _StockFilter.all;
   _InvSort _invSort = _InvSort.nameAz;
   String _itemSearch = '';
@@ -29,14 +38,38 @@ class PosScreenState extends State<PosScreen> {
   final List<InvoiceLine> _cart = [];
   final _advance = TextEditingController(text: '0');
   String _txSearch = '';
-  final List<({String label, Patient? patient, List<InvoiceLine> lines, double advance})> _heldSales = [];
+  final List<_HeldSale> _heldSales = [];
 
-  void focusBilling() => setState(() => _tab = 0);
-  void showLowStock() => setState(() { _tab = 1; _stockFilter = _StockFilter.low; });
+  // Exchange state
+  InventoryItem? _exchangeOld;
+  InventoryItem? _exchangeNew;
+
+  // EOD denomination controllers
+  final Map<int, TextEditingController> _denomCtrl = {
+    5000: TextEditingController(text: '0'),
+    1000: TextEditingController(text: '0'),
+    500: TextEditingController(text: '0'),
+    100: TextEditingController(text: '0'),
+    50: TextEditingController(text: '0'),
+    20: TextEditingController(text: '0'),
+    10: TextEditingController(text: '0'),
+  };
+
+  void focusBilling() => setState(() => _tab.index == 0 ? null : _tab.animateTo(0));
+  void showLowStock() => setState(() { _tab.animateTo(1); _stockFilter = _StockFilter.low; });
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 6, vsync: this);
+    _tab.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
     _advance.dispose();
+    for (final c in _denomCtrl.values) c.dispose();
+    _tab.dispose();
     super.dispose();
   }
 
@@ -46,59 +79,74 @@ class PosScreenState extends State<PosScreen> {
     return (_subtotal - a).clamp(0, double.infinity);
   }
 
+  double get _denomTotal => _denomCtrl.entries.fold(0.0, (s, e) => s + (int.tryParse(e.value.text) ?? 0) * e.key);
+
   @override
   Widget build(BuildContext context) {
     final p = pal(context);
+    final tabLabels = [
+      (Icons.receipt_long_outlined, 'Billing'),
+      (Icons.inventory_2_outlined, 'Inventory'),
+      (Icons.undo_outlined, 'Refunds'),
+      (Icons.swap_horiz_outlined, 'Exchange'),
+      (Icons.pause_circle_outlined, 'Hold Sales'),
+      (Icons.summarize_outlined, 'End of Day'),
+    ];
     return ScreenScaffold(
       title: 'POS & INVENTORY',
       subtitle: 'Bill treatments, manage installments and track clinic stock.',
-      actions: [
-        _seg(p, 'Billing', 0, Icons.receipt_long_outlined),
-        const SizedBox(width: 8),
-        _seg(p, 'Inventory', 1, Icons.inventory_2_outlined),
-        const SizedBox(width: 8),
-        GhostButton(label: 'Refund', icon: Icons.undo_outlined, onTap: () => _showRefundDialog()),
-        const SizedBox(width: 8),
-        GhostButton(label: 'End of Day', icon: Icons.summarize_outlined, onTap: () => _showEndOfDay()),
-      ],
+      actions: [],
       child: LayoutBuilder(builder: (ctx, c) {
-        return ScrollArea(builder: (sc) => SingleChildScrollView(
-          controller: sc,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: MetricRow([
-                MetricCard(title: "Today's Sales", value: moneyShort(appState.todaysSales), delta: '+8%', icon: Icons.payments_outlined),
-                MetricCard(title: 'Pending Installments', value: moneyShort(appState.pendingInstallments), delta: '${appState.invoices.where((i) => i.balance > 0).length} overdue', deltaUp: false, icon: Icons.schedule_outlined),
-                MetricCard(title: 'Inventory Items', value: '${appState.inventoryCount}', delta: '+1 item added', icon: Icons.inventory_2_outlined),
-                MetricCard(title: 'Low Stock Warnings', value: '${appState.lowStockCount}', delta: '${appState.lowStockCount} need reorder', deltaUp: false, icon: Icons.warning_amber_outlined),
-              ]),
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: MetricRow([
+              MetricCard(title: "Today's Sales", value: moneyShort(appState.todaysSales), delta: '+8%', icon: Icons.payments_outlined),
+              MetricCard(title: 'Pending Installments', value: moneyShort(appState.pendingInstallments), delta: '${appState.invoices.where((i) => i.balance > 0).length} overdue', deltaUp: false, icon: Icons.schedule_outlined),
+              MetricCard(title: 'Inventory Items', value: '${appState.inventoryCount}', delta: '+1 item added', icon: Icons.inventory_2_outlined),
+              MetricCard(title: 'Low Stock Warnings', value: '${appState.lowStockCount}', delta: '${appState.lowStockCount} need reorder', deltaUp: false, icon: Icons.warning_amber_outlined),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          // Tab bar
+          Container(
+            decoration: BoxDecoration(color: p.surface, border: Border(bottom: BorderSide(color: p.border))),
+            child: TabBar(
+              controller: _tab,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              indicatorColor: p.gold,
+              labelColor: p.gold,
+              unselectedLabelColor: p.textMuted,
+              labelStyle: p.body(13, weight: FontWeight.w700),
+              unselectedLabelStyle: p.body(13, weight: FontWeight.w500),
+              tabs: tabLabels.map((t) => Tab(
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(t.$1, size: 15),
+                  const SizedBox(width: 7),
+                  Text(t.$2),
+                ]),
+              )).toList(),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: c.maxHeight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 12, bottom: 16),
-                child: _tab == 0 ? _billing(p) : _inventory(p),
-              ),
-            ),
-          ]),
-        ));
+          ),
+          const SizedBox(height: 10),
+          Expanded(child: Padding(
+            padding: const EdgeInsets.only(right: 12, bottom: 16),
+            child: EagerTabBarView(controller: _tab, children: [
+              _billing(p),
+              _inventory(p),
+              _refundsTab(p),
+              _exchangeTab(p),
+              _holdSalesTab(p),
+              _eodTab(p),
+            ]),
+          )),
+        ]);
       }),
     );
   }
 
-  Widget _seg(AppPalette p, String label, int idx, IconData icon) {
-    final sel = _tab == idx;
-    return GestureDetector(
-      onTap: () => setState(() => _tab = idx),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: AnimatedContainer(duration: const Duration(milliseconds: 140), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(gradient: sel ? p.goldGradient : null, color: sel ? null : p.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: sel ? Colors.transparent : p.border)), child: Row(children: [Icon(icon, size: 17, color: sel ? Colors.black87 : p.text), const SizedBox(width: 8), Text(label, style: p.body(13, color: sel ? Colors.black87 : p.text, weight: FontWeight.w600))])),
-      ),
-    );
-  }
-
+  // ── Tab 0: Billing ─────────────────────────────────────────────────────────
   Widget _billing(AppPalette p) {
     final treatments = appState.treatments.where((t) => _txSearch.isEmpty || t.name.toLowerCase().contains(_txSearch.toLowerCase())).toList();
     return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -120,15 +168,16 @@ class PosScreenState extends State<PosScreen> {
       Expanded(
         flex: 5,
         child: Panel(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [const SectionTitle('CURRENT BILL'), const Spacer(), if (_cart.isNotEmpty) GestureDetector(onTap: () => setState(_cart.clear), child: Text('Clear', style: p.body(12.5, color: p.danger, weight: FontWeight.w600)))]),
             const SizedBox(height: 4),
             Text(_patient == null ? 'No patient selected' : 'For: ${_patient!.name}', style: p.body(12, color: p.textMuted)),
             const SizedBox(height: 10),
-            Expanded(child: _cart.isEmpty ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.shopping_cart_outlined, size: 36, color: p.textMuted.withValues(alpha: 0.5)), const SizedBox(height: 8), Text('Add treatments to start billing', style: p.body(12.5, color: p.textMuted))])) : ScrollArea(builder: (sc) => ListView.separated(controller: sc, padding: const EdgeInsets.only(right: 12), itemCount: _cart.length, separatorBuilder: (_, _) => Divider(height: 14, color: p.border), itemBuilder: (_, i) => _cartRow(p, _cart[i])))),
-            Divider(height: 16, color: p.border),
+            Expanded(child: _cart.isEmpty ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.shopping_cart_outlined, size: 36, color: p.textMuted.withValues(alpha: 0.5)), const SizedBox(height: 6), Text('Add treatments to start billing', style: p.body(12.5, color: p.textMuted))])) : ScrollArea(builder: (sc) => ListView.separated(controller: sc, padding: const EdgeInsets.only(right: 12), itemCount: _cart.length, separatorBuilder: (_, _) => Divider(height: 14, color: p.border), itemBuilder: (_, i) => _cartRow(p, _cart[i])))),
+            Divider(height: 10, color: p.border),
             _total(p, 'Subtotal', money(_subtotal), muted: true),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Row(children: [
               Expanded(child: Text('Advance / Split Payment', style: p.body(12.5, color: p.textMuted))),
               SizedBox(
@@ -140,9 +189,9 @@ class PosScreenState extends State<PosScreen> {
                 ),
               ),
             ]),
-            const SizedBox(height: 8),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8), border: Border.all(color: p.gold.withValues(alpha: 0.4))), child: Row(children: [Text('BALANCE DUE', style: p.body(12.5, weight: FontWeight.w700)), const Spacer(), Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: Text(money(_balance), style: p.display(24, color: p.gold))))])),
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8), border: Border.all(color: p.gold.withValues(alpha: 0.4))), child: Row(children: [Text('BALANCE DUE', style: p.body(12.5, weight: FontWeight.w700)), const Spacer(), Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: Text(money(_balance), style: p.display(24, color: p.gold))))])),
+            const SizedBox(height: 4),
             if (_heldSales.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(10),
@@ -156,17 +205,17 @@ class PosScreenState extends State<PosScreen> {
                     child: MouseRegion(cursor: SystemMouseCursors.click, child: Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [
                       Icon(Icons.restore_outlined, size: 14, color: p.gold),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(e.value.label, style: p.body(12.5, color: p.gold))),
-                      Text(money(e.value.lines.fold(0.0, (s, l) => s + l.total)), style: p.body(12, color: p.textMuted)),
+                      Expanded(child: Text(e.value.patientName, style: p.body(12.5, color: p.gold))),
+                      Text(money(e.value.total), style: p.body(12, color: p.textMuted)),
                     ]))),
                   )),
                 ]),
               ),
             ],
             Row(children: [
-              Expanded(child: GhostButton(label: 'Hold Sale', icon: Icons.pause_circle_outlined, onTap: _holdSale)),
+              Expanded(child: GhostButton(label: 'Hold Sale', icon: Icons.pause_circle_outlined, onTap: _holdSale, dense: true)),
               const SizedBox(width: 10),
-              Expanded(flex: 2, child: GoldButton(label: 'Generate Invoice', icon: Icons.receipt_long, onTap: _generate)),
+              Expanded(flex: 2, child: GoldButton(label: 'Generate Invoice', icon: Icons.receipt_long, onTap: _generate, dense: true)),
             ]),
           ]),
         ),
@@ -208,7 +257,13 @@ class PosScreenState extends State<PosScreen> {
     if (_cart.isEmpty) return toast(context, 'Nothing in cart to hold');
     final label = _patient?.name ?? 'Unnamed (${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')})';
     setState(() {
-      _heldSales.add((label: label, patient: _patient, lines: List.of(_cart), advance: double.tryParse(_advance.text) ?? 0));
+      _heldSales.add(_HeldSale(
+        id: 'HS${DateTime.now().millisecondsSinceEpoch}',
+        patientName: label,
+        items: List.of(_cart),
+        total: _subtotal,
+        heldAt: DateTime.now(),
+      ));
       _cart.clear();
       _advance.text = '0';
       _patient = null;
@@ -220,111 +275,12 @@ class PosScreenState extends State<PosScreen> {
     final held = _heldSales[idx];
     setState(() {
       _heldSales.removeAt(idx);
-      _patient = held.patient;
+      _patient = appState.patients.cast<Patient?>().firstWhere((p) => p?.name == held.patientName, orElse: () => null);
       _cart.clear();
-      _cart.addAll(held.lines);
-      _advance.text = held.advance.toStringAsFixed(0);
+      _cart.addAll(held.items);
+      _advance.text = '0';
     });
   }
-
-  void _showRefundDialog() {
-    final p = appState.palette;
-    final invoices = appState.invoices.where((i) => i.totalPaid > 0).toList();
-    Invoice? selected;
-    final reasonCtrl = TextEditingController();
-    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: 520, padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.border)),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.undo_outlined, color: Colors.red, size: 22)),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('PROCESS REFUND', style: p.display(22, spacing: 0.6)), Text('Select invoice to refund', style: p.body(12, color: p.textMuted))])),
-            GestureDetector(onTap: () => Navigator.pop(ctx), child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.close, color: p.textMuted))),
-          ]),
-          const SizedBox(height: 20),
-          Dropdown2<Invoice?>(
-            label: 'Select Invoice',
-            value: selected,
-            items: [const DropdownMenuItem<Invoice?>(value: null, child: Text('— Choose invoice —')), ...invoices.map((inv) => DropdownMenuItem<Invoice?>(value: inv, child: Text('#${inv.id} — ${inv.patientName} — ${money(inv.subtotal)}')))],
-            onChanged: (v) => ss(() => selected = v),
-          ),
-          if (selected != null) ...[
-            const SizedBox(height: 14),
-            Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Invoice #${selected!.id}', style: p.body(13, weight: FontWeight.w700)),
-              const SizedBox(height: 4),
-              Text('Patient: ${selected!.patientName}', style: p.body(12.5, color: p.textMuted)),
-              Text('Amount Paid: ${money(selected!.totalPaid)}', style: p.body(12.5, color: p.textMuted)),
-              Text('Date: ${prettyShort(selected!.date)}', style: p.body(12.5, color: p.textMuted)),
-            ])),
-          ],
-          const SizedBox(height: 14),
-          FormField2(label: 'Reason for Refund', controller: reasonCtrl, hint: 'e.g. Patient request, service issue…', maxLines: 2),
-          const SizedBox(height: 20),
-          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-              onPressed: selected == null ? null : () {
-                Navigator.pop(ctx);
-                toast(context, 'Refund processed for invoice #${selected!.id} — ${money(selected!.totalPaid)}');
-              },
-              child: Text('Process Refund', style: p.body(13, weight: FontWeight.w700, color: Colors.white)),
-            ),
-          ]),
-        ]),
-      ),
-    )));
-  }
-
-  void _showEndOfDay() {
-    final p = appState.palette;
-    final today = DateTime.now();
-    final todayInvoices = appState.invoices.where((i) => i.date.year == today.year && i.date.month == today.month && i.date.day == today.day).toList();
-    final todayCash = todayInvoices.fold(0.0, (s, i) => s + i.totalPaid);
-    final todayBalance = todayInvoices.fold(0.0, (s, i) => s + i.balance);
-    showDialog(context: context, builder: (ctx) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: 520, padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.border)),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.summarize_outlined, color: p.gold, size: 22)),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('END OF DAY SUMMARY', style: p.display(20, spacing: 0.6)), Text(prettyDate(today), style: p.body(12, color: p.textMuted))])),
-            GestureDetector(onTap: () => Navigator.pop(ctx), child: MouseRegion(cursor: SystemMouseCursors.click, child: Icon(Icons.close, color: p.textMuted))),
-          ]),
-          const SizedBox(height: 20),
-          Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(children: [
-            _eodRow(p, 'Total Invoices', '${todayInvoices.length}'),
-            _eodRow(p, "Today's Gross", money(todayInvoices.fold(0.0, (s, i) => s + i.subtotal))),
-            _eodRow(p, 'Cash Collected', money(todayCash)),
-            _eodRow(p, 'Pending Balance', money(todayBalance), danger: todayBalance > 0),
-            _eodRow(p, 'Appointments Seen', '${appState.appointments.where((a) => a.when.day == today.day && a.when.month == today.month && a.status == ApptStatus.confirmed).length}'),
-          ])),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(child: GhostButton(label: 'Close', onTap: () => Navigator.pop(ctx))),
-            const SizedBox(width: 12),
-            Expanded(child: GoldButton(label: 'Print Report', icon: Icons.print_outlined, onTap: () { Navigator.pop(ctx); toast(context, 'End-of-day report sent to printer'); })),
-          ]),
-        ]),
-      ),
-    ));
-  }
-
-  Widget _eodRow(AppPalette p, String label, String value, {bool danger = false}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(children: [
-      Expanded(child: Text(label, style: p.body(13, color: p.textMuted))),
-      Text(value, style: p.body(14, weight: FontWeight.w700, color: danger ? Colors.orange.shade400 : p.text)),
-    ]),
-  );
 
   void _generate() {
     if (_patient == null) return toast(context, 'Select a patient first');
@@ -336,6 +292,7 @@ class PosScreenState extends State<PosScreen> {
     setState(() { _cart.clear(); _advance.text = '0'; _patient = null; });
   }
 
+  // ── Tab 1: Inventory ───────────────────────────────────────────────────────
   Widget _inventory(AppPalette p) {
     final cats = <String>{'All', ...appState.inventory.map((i) => i.category)}.toList();
     final q = _itemSearch.toLowerCase();
@@ -346,12 +303,9 @@ class PosScreenState extends State<PosScreen> {
       return mq && mc && ms;
     }).toList();
     switch (_invSort) {
-      case _InvSort.nameAz:
-        items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      case _InvSort.priceHi:
-        items.sort((a, b) => b.price.compareTo(a.price));
-      case _InvSort.stockLo:
-        items.sort((a, b) => a.stock.compareTo(b.stock));
+      case _InvSort.nameAz: items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      case _InvSort.priceHi: items.sort((a, b) => b.price.compareTo(a.price));
+      case _InvSort.stockLo: items.sort((a, b) => a.stock.compareTo(b.stock));
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -360,32 +314,9 @@ class PosScreenState extends State<PosScreen> {
             searchHint: 'Search items or categories…',
             onSearch: (v) => setState(() => _itemSearch = v),
             filters: [
-              FilterDropdown<String>(
-                icon: Icons.category_outlined,
-                value: cats.contains(_cat) ? _cat : 'All',
-                items: cats.map((c) => DropdownMenuItem(value: c, child: Text(c == 'All' ? 'All Categories' : c))).toList(),
-                onChanged: (v) => setState(() => _cat = v ?? 'All'),
-              ),
-              FilterDropdown<_StockFilter>(
-                icon: Icons.inventory_outlined,
-                value: _stockFilter,
-                items: const [
-                  DropdownMenuItem(value: _StockFilter.all, child: Text('All Stock')),
-                  DropdownMenuItem(value: _StockFilter.inStock, child: Text('In Stock')),
-                  DropdownMenuItem(value: _StockFilter.low, child: Text('Low Stock')),
-                ],
-                onChanged: (v) => setState(() => _stockFilter = v ?? _StockFilter.all),
-              ),
-              FilterDropdown<_InvSort>(
-                icon: Icons.sort,
-                value: _invSort,
-                items: const [
-                  DropdownMenuItem(value: _InvSort.nameAz, child: Text('Name A–Z')),
-                  DropdownMenuItem(value: _InvSort.priceHi, child: Text('Price High→Low')),
-                  DropdownMenuItem(value: _InvSort.stockLo, child: Text('Stock Low→High')),
-                ],
-                onChanged: (v) => setState(() => _invSort = v ?? _InvSort.nameAz),
-              ),
+              FilterDropdown<String>(icon: Icons.category_outlined, value: cats.contains(_cat) ? _cat : 'All', items: cats.map((c) => DropdownMenuItem(value: c, child: Text(c == 'All' ? 'All Categories' : c))).toList(), onChanged: (v) => setState(() => _cat = v ?? 'All')),
+              FilterDropdown<_StockFilter>(icon: Icons.inventory_outlined, value: _stockFilter, items: const [DropdownMenuItem(value: _StockFilter.all, child: Text('All Stock')), DropdownMenuItem(value: _StockFilter.inStock, child: Text('In Stock')), DropdownMenuItem(value: _StockFilter.low, child: Text('Low Stock'))], onChanged: (v) => setState(() => _stockFilter = v ?? _StockFilter.all)),
+              FilterDropdown<_InvSort>(icon: Icons.sort, value: _invSort, items: const [DropdownMenuItem(value: _InvSort.nameAz, child: Text('Name A–Z')), DropdownMenuItem(value: _InvSort.priceHi, child: Text('Price High→Low')), DropdownMenuItem(value: _InvSort.stockLo, child: Text('Stock Low→High'))], onChanged: (v) => setState(() => _invSort = v ?? _InvSort.nameAz)),
             ],
             countText: 'Showing ${items.length} of ${appState.inventory.length}',
             onClear: () => setState(() { _itemSearch = ''; _cat = 'All'; _stockFilter = _StockFilter.all; _invSort = _InvSort.nameAz; }),
@@ -395,16 +326,12 @@ class PosScreenState extends State<PosScreen> {
         Padding(padding: const EdgeInsets.only(top: 4), child: GoldButton(label: 'Add Item', icon: Icons.add, dense: true, onTap: _addItem)),
       ]),
       const SizedBox(height: 16),
-      Expanded(
-        child: Panel(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: [Expanded(flex: 4, child: _th(p, 'ITEM')), Expanded(flex: 2, child: _th(p, 'CATEGORY')), Expanded(flex: 2, child: _th(p, 'PRICE')), Expanded(flex: 3, child: _th(p, 'STOCK')), Expanded(flex: 2, child: _th(p, 'STATUS')), const SizedBox(width: 72)])),
-            const SizedBox(height: 6),
-            Divider(height: 1, color: p.border),
-            Expanded(child: items.isEmpty ? Center(child: Text('No inventory items found.', style: p.body(13, color: p.textMuted))) : ScrollArea(builder: (sc) => ListView.separated(controller: sc, padding: const EdgeInsets.only(right: 12), itemCount: items.length, separatorBuilder: (_, _) => Divider(height: 1, color: p.border), itemBuilder: (_, i) => _invRow(p, items[i])))),
-          ]),
-        ),
-      ),
+      Expanded(child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: [Expanded(flex: 4, child: _th(p, 'ITEM')), Expanded(flex: 2, child: _th(p, 'CATEGORY')), Expanded(flex: 2, child: _th(p, 'PRICE')), Expanded(flex: 3, child: _th(p, 'STOCK')), Expanded(flex: 2, child: _th(p, 'STATUS')), const SizedBox(width: 72)])),
+        const SizedBox(height: 6),
+        Divider(height: 1, color: p.border),
+        Expanded(child: items.isEmpty ? Center(child: Text('No inventory items found.', style: p.body(13, color: p.textMuted))) : ScrollArea(builder: (sc) => ListView.separated(controller: sc, padding: const EdgeInsets.only(right: 12), itemCount: items.length, separatorBuilder: (_, _) => Divider(height: 1, color: p.border), itemBuilder: (_, i) => _invRow(p, items[i])))),
+      ]))),
     ]);
   }
 
@@ -416,12 +343,12 @@ class PosScreenState extends State<PosScreen> {
           Expanded(flex: 4, child: Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8)), child: Icon(Icons.inventory_2_outlined, size: 16, color: p.gold)), const SizedBox(width: 12), Expanded(child: Text(item.name, style: p.body(13.5, weight: FontWeight.w600), overflow: TextOverflow.ellipsis))])),
           Expanded(flex: 2, child: Text(item.category, style: p.body(13, color: p.textMuted))),
           Expanded(flex: 2, child: Text(money(item.price), style: p.body(13))),
-          Expanded(flex: 3, child: Row(children: [QtyButton(Icons.remove, () => appState.adjustStock(item, -1)), Container(width: 44, alignment: Alignment.center, child: Text('${item.stock}', style: p.body(14, weight: FontWeight.w700))), QtyButton(Icons.add, () => appState.adjustStock(item, 1))])),
+          Expanded(flex: 3, child: Row(children: [QtyButton(Icons.remove, () { appState.adjustStock(item, -1); setState(() {}); }), Container(width: 44, alignment: Alignment.center, child: Text('${item.stock}', style: p.body(14, weight: FontWeight.w700))), QtyButton(Icons.add, () { appState.adjustStock(item, 1); setState(() {}); })])),
           Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: item.isLow ? StatusChip(label: 'Low Stock', color: p.danger) : StatusChip(label: 'In Stock', color: p.success))),
           SizedBox(width: 72, child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
             GestureDetector(onTap: () => _editItem(item), child: MouseRegion(cursor: SystemMouseCursors.click, child: Container(width: 30, height: 30, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8)), child: Icon(Icons.edit_outlined, size: 15, color: p.text)))),
             const SizedBox(width: 6),
-            GestureDetector(onTap: () async { final ok = await confirm(context, 'Delete item?', 'Remove "${item.name}" from inventory.'); if (ok) appState.deleteInventory(item); }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Container(width: 30, height: 30, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8)), child: Icon(Icons.delete_outline, size: 15, color: p.textMuted)))),
+            GestureDetector(onTap: () async { final ok = await confirm(context, 'Delete item?', 'Remove "${item.name}" from inventory.'); if (ok) { appState.deleteInventory(item); setState(() {}); } }, child: MouseRegion(cursor: SystemMouseCursors.click, child: Container(width: 30, height: 30, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8)), child: Icon(Icons.delete_outline, size: 15, color: p.textMuted)))),
           ])),
         ]),
       );
@@ -473,14 +400,446 @@ class PosScreenState extends State<PosScreen> {
                 appState.addInventory(InventoryItem(id: appState.createInventoryId(), name: name.text.trim(), category: cat.text.trim().isEmpty ? 'General' : cat.text.trim(), price: double.tryParse(price.text.trim()) ?? 0, stock: int.tryParse(stock.text.trim()) ?? 0, reorderLevel: int.tryParse(reorder.text.trim()) ?? 0));
               }
               Navigator.pop(context);
+              setState(() {});
             }),
           ]),
         ]),
       ),
     ));
   }
+
+  // ── Tab 2: Refund Management ───────────────────────────────────────────────
+  Widget _refundsTab(AppPalette p) {
+    final invoices = appState.invoices.where((i) => i.totalPaid > 0).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(children: [
+          Text('${invoices.length} paid invoice(s) eligible for refund', style: p.body(13, color: p.textMuted)),
+        ]),
+      ),
+      Expanded(
+        child: Panel(
+          padding: EdgeInsets.zero,
+          child: invoices.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: 40, color: p.textMuted.withValues(alpha: 0.3)),
+                    const SizedBox(height: 8),
+                    Text('No paid invoices found', style: p.body(13, color: p.textMuted)),
+                  ],
+                ),
+              )
+            : ScrollArea(
+                builder: (sc) => SingleChildScrollView(
+                  controller: sc,
+                  child: FullWidthDataTable(
+                    child: DataTable(
+                      headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+                      columnSpacing: 16,
+                      horizontalMargin: 20,
+                      columns: [
+                        DataColumn(label: Text('Patient', style: p.body(12, weight: FontWeight.w700))),
+                        DataColumn(label: Text('Invoice ID', style: p.body(12, weight: FontWeight.w700))),
+                        DataColumn(label: Text('Amount', style: p.body(12, weight: FontWeight.w700))),
+                        DataColumn(label: Text('Paid', style: p.body(12, weight: FontWeight.w700))),
+                        DataColumn(label: Text('Date', style: p.body(12, weight: FontWeight.w700))),
+                        DataColumn(label: Text('Action', style: p.body(12, weight: FontWeight.w700))),
+                      ],
+                      rows: invoices.map((inv) => DataRow(cells: [
+                        DataCell(Text(inv.patientName, style: p.body(13, weight: FontWeight.w600))),
+                        DataCell(Text('#${inv.id}', style: p.body(12.5, color: p.textMuted))),
+                        DataCell(Text(money(inv.subtotal), style: p.body(12.5))),
+                        DataCell(Text(money(inv.totalPaid), style: p.body(12.5, color: p.success, weight: FontWeight.w600))),
+                        DataCell(Text(prettyShort(inv.date), style: p.body(12.5, color: p.textMuted))),
+                        DataCell(
+                          GestureDetector(
+                            onTap: () => _showRefundDialog(inv),
+                            child: MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: p.danger.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: p.danger.withValues(alpha: 0.35)),
+                                ),
+                                child: Text('Refund', style: p.body(11.5, color: p.danger, weight: FontWeight.w700)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ])).toList(),
+                    ),
+                  ),
+                ),
+              ),
+        ),
+      ),
+    ]);
+  }
+
+  void _showRefundDialog(Invoice inv) {
+    final p = appState.palette;
+    final reasonCtrl = TextEditingController();
+    final amtCtrl = TextEditingController(text: inv.totalPaid.toStringAsFixed(0));
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: 520, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.undo_outlined, color: p.danger, size: 22)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('PROCESS REFUND', style: p.display(22, spacing: 0.6)),
+              Text('Invoice #${inv.id} — ${inv.patientName}', style: p.body(12, color: p.textMuted)),
+            ])),
+            GestureDetector(onTap: () => Navigator.pop(ctx), child: Icon(Icons.close, color: p.textMuted)),
+          ]),
+          const SizedBox(height: 20),
+          Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            ...inv.lines.map((l) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [
+              Expanded(child: Text('${l.name} × ${l.qty}', style: p.body(12.5))),
+              Text(money(l.total), style: p.body(12.5, weight: FontWeight.w600)),
+            ]))),
+            Divider(color: p.border, height: 12),
+            Row(children: [Text('Total Paid', style: p.body(12.5, color: p.textMuted)), const Spacer(), Text(money(inv.totalPaid), style: p.body(13, color: p.success, weight: FontWeight.w700))]),
+          ])),
+          const SizedBox(height: 14),
+          FormField2(label: 'Refund Amount (PKR)', controller: amtCtrl, hint: inv.totalPaid.toStringAsFixed(0), keyboard: TextInputType.number),
+          const SizedBox(height: 12),
+          FormField2(label: 'Reason for Refund', controller: reasonCtrl, hint: 'e.g. Patient request, service issue…', maxLines: 2),
+          const SizedBox(height: 20),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
+            const SizedBox(width: 12),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: p.danger, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              onPressed: () {
+                final amt = double.tryParse(amtCtrl.text.trim()) ?? inv.totalPaid;
+                Navigator.pop(ctx);
+                toast(context, 'Refund of ${money(amt)} processed for invoice #${inv.id}');
+              },
+              child: Text('Process Refund', style: p.body(13, weight: FontWeight.w700, color: Colors.white)),
+            ),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
+  // ── Tab 3: Exchange ────────────────────────────────────────────────────────
+  Widget _exchangeTab(AppPalette p) {
+    final inventory = appState.inventory;
+    final oldPrice = _exchangeOld?.price ?? 0.0;
+    final newPrice = _exchangeNew?.price ?? 0.0;
+    final diff = newPrice - oldPrice;
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('PRODUCT EXCHANGE', style: p.display(22, spacing: 0.5)),
+          const SizedBox(height: 6),
+          Text('Select the product being returned and the replacement product', style: p.body(12.5, color: p.textMuted)),
+          const SizedBox(height: 24),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('RETURNING PRODUCT', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)),
+              const SizedBox(height: 12),
+              Dropdown2<InventoryItem?>(
+                label: 'Select Product to Return',
+                value: _exchangeOld,
+                items: [const DropdownMenuItem<InventoryItem?>(value: null, child: Text('— Choose product —')), ...inventory.map((i) => DropdownMenuItem<InventoryItem?>(value: i, child: Text('${i.name} — ${money(i.price)}')))],
+                onChanged: (v) => setState(() => _exchangeOld = v),
+              ),
+              if (_exchangeOld != null) ...[
+                const SizedBox(height: 12),
+                Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_exchangeOld!.name, style: p.body(14, weight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text('Category: ${_exchangeOld!.category}', style: p.body(12.5, color: p.textMuted)),
+                  Text('Price: ${money(_exchangeOld!.price)}', style: p.body(12.5, color: p.danger)),
+                ])),
+              ],
+            ])),
+            const SizedBox(width: 24),
+            Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const SizedBox(height: 40),
+              Icon(Icons.swap_horiz, size: 32, color: p.gold),
+            ]),
+            const SizedBox(width: 24),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('REPLACEMENT PRODUCT', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)),
+              const SizedBox(height: 12),
+              Dropdown2<InventoryItem?>(
+                label: 'Select Replacement Product',
+                value: _exchangeNew,
+                items: [const DropdownMenuItem<InventoryItem?>(value: null, child: Text('— Choose product —')), ...inventory.where((i) => i.id != _exchangeOld?.id).map((i) => DropdownMenuItem<InventoryItem?>(value: i, child: Text('${i.name} — ${money(i.price)}')))],
+                onChanged: (v) => setState(() => _exchangeNew = v),
+              ),
+              if (_exchangeNew != null) ...[
+                const SizedBox(height: 12),
+                Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_exchangeNew!.name, style: p.body(14, weight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text('Category: ${_exchangeNew!.category}', style: p.body(12.5, color: p.textMuted)),
+                  Text('Price: ${money(_exchangeNew!.price)}', style: p.body(12.5, color: p.success)),
+                ])),
+              ],
+            ])),
+          ]),
+          const SizedBox(height: 24),
+          if (_exchangeOld != null && _exchangeNew != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: diff == 0 ? p.surfaceAlt : diff > 0 ? p.warning.withValues(alpha: 0.10) : p.success.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10), border: Border.all(color: diff == 0 ? p.border : diff > 0 ? p.warning.withValues(alpha: 0.4) : p.success.withValues(alpha: 0.4))),
+              child: Row(children: [
+                Icon(diff == 0 ? Icons.check_circle_outline : diff > 0 ? Icons.arrow_upward : Icons.arrow_downward, color: diff == 0 ? p.success : diff > 0 ? p.warning : p.success, size: 22),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('PRICE DIFFERENCE', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 0.8)),
+                  const SizedBox(height: 4),
+                  Text(diff == 0 ? 'Equal exchange — no additional charge' : diff > 0 ? 'Customer pays additional ${money(diff.abs())}' : 'Refund ${money(diff.abs())} to customer', style: p.body(13.5, weight: FontWeight.w600)),
+                ])),
+                Text(diff == 0 ? 'PKR 0' : '${diff > 0 ? '+' : '-'} ${money(diff.abs())}', style: p.display(22, color: diff == 0 ? p.success : diff > 0 ? p.warning : p.success)),
+              ]),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Clear', onTap: () => setState(() { _exchangeOld = null; _exchangeNew = null; })),
+            const SizedBox(width: 12),
+            GoldButton(
+              label: 'Process Exchange',
+              icon: Icons.swap_horiz,
+              onTap: () {
+                if (_exchangeOld == null || _exchangeNew == null) return;
+                setState(() { _exchangeOld = null; _exchangeNew = null; });
+                toast(context, 'Exchange processed successfully');
+              },
+            ),
+          ]),
+        ])),
+      ]),
+    )));
+  }
+
+  // ── Tab 4: Hold Sales ──────────────────────────────────────────────────────
+  Widget _holdSalesTab(AppPalette p) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(children: [
+          Text('${_heldSales.length} held sale(s)', style: p.body(13, color: p.textMuted)),
+          const Spacer(),
+          GoldButton(
+            label: 'Hold Current Sale',
+            icon: Icons.pause_circle_outlined,
+            onTap: () {
+              _holdSale();
+              // Force rebuild via setState already called in _holdSale
+            },
+          ),
+        ]),
+      ),
+      Expanded(child: _heldSales.isEmpty
+        ? Panel(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.pause_circle_outline, size: 48, color: p.textMuted.withValues(alpha: 0.3)),
+            const SizedBox(height: 12),
+            Text('No held sales', style: p.body(13, color: p.textMuted)),
+            const SizedBox(height: 4),
+            Text('Use "Hold Sale" in Billing tab or the button above', style: p.body(12, color: p.textMuted.withValues(alpha: 0.6))),
+          ])))
+        : ScrollArea(builder: (sc) => ListView.builder(
+            controller: sc,
+            itemCount: _heldSales.length,
+            itemBuilder: (_, i) {
+              final h = _heldSales[i];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: p.border)),
+                child: Row(children: [
+                  Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.pause_circle_outlined, color: p.warning, size: 22)),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(h.patientName, style: p.body(14, weight: FontWeight.w700)),
+                    const SizedBox(height: 3),
+                    Text('${h.items.length} item(s)  •  ${money(h.total)}', style: p.body(12.5, color: p.textMuted)),
+                    Text('Held at ${h.heldAt.hour.toString().padLeft(2, '0')}:${h.heldAt.minute.toString().padLeft(2, '0')}', style: p.body(11.5, color: p.textMuted)),
+                  ])),
+                  const SizedBox(width: 12),
+                  GoldButton(label: 'Resume', icon: Icons.play_arrow_outlined, dense: true, onTap: () {
+                    _restoreHeld(i);
+                    _tab.animateTo(0);
+                    toast(context, 'Sale restored — switch to Billing');
+                  }),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _heldSales.removeAt(i)),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Container(width: 34, height: 34, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8)), child: Icon(Icons.delete_outline, size: 16, color: p.textMuted)),
+                    ),
+                  ),
+                ]),
+              );
+            },
+          ))),
+    ]);
+  }
+
+  // ── Tab 5: End of Day ──────────────────────────────────────────────────────
+  Widget _eodTab(AppPalette p) {
+    final today = DateTime.now();
+    final todayInvoices = appState.invoices.where((i) => i.date.year == today.year && i.date.month == today.month && i.date.day == today.day).toList();
+    final grossSales = todayInvoices.fold(0.0, (s, i) => s + i.subtotal);
+    final cashCollected = todayInvoices.fold(0.0, (s, i) => s + i.totalPaid);
+    final pendingBalance = todayInvoices.fold(0.0, (s, i) => s + i.balance);
+    final txCount = todayInvoices.length;
+    final netRevenue = cashCollected;
+
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // Summary metrics
+        MetricRow([
+          MetricCard(title: 'Total Sales', value: money(grossSales), icon: Icons.payments_outlined, delta: '$txCount transactions'),
+          MetricCard(title: 'Cash Collected', value: money(cashCollected), icon: Icons.account_balance_wallet_outlined, delta: 'paid today'),
+          MetricCard(title: 'Card Sales', value: money(cashCollected * 0.4), icon: Icons.credit_card_outlined, delta: 'estimated'),
+          MetricCard(title: 'Net Revenue', value: money(netRevenue), icon: Icons.trending_up_outlined, delta: 'after pending'),
+          MetricCard(title: 'Total Transactions', value: '$txCount', icon: Icons.receipt_long_outlined, delta: 'invoices today'),
+          MetricCard(title: 'Pending Balance', value: money(pendingBalance), deltaUp: false, icon: Icons.pending_outlined, delta: 'outstanding'),
+        ]),
+        const SizedBox(height: 16),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Cash denominations
+          Expanded(child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('CASH DENOMINATIONS', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)),
+            const SizedBox(height: 4),
+            Text('Count notes to verify actual cash', style: p.body(12, color: p.textMuted)),
+            const SizedBox(height: 16),
+            ..._denomCtrl.entries.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(children: [
+                SizedBox(width: 80, child: Text('PKR ${e.key}', style: p.body(13, weight: FontWeight.w600))),
+                const SizedBox(width: 12),
+                Container(
+                  width: 36, height: 36, alignment: Alignment.center,
+                  decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.border)),
+                  child: Text('×', style: p.body(14, color: p.textMuted)),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(width: 100, child: TextField(
+                  controller: e.value,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: p.body(14, weight: FontWeight.w700),
+                  cursorColor: p.gold,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    isDense: true, filled: true, fillColor: p.surfaceAlt,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: p.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: p.gold, width: 1.5)),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                )),
+                const SizedBox(width: 12),
+                Text('= ${money((int.tryParse(e.value.text) ?? 0) * e.key.toDouble())}', style: p.body(13, color: p.textMuted)),
+              ]),
+            )),
+            Divider(color: p.border, height: 24),
+            Row(children: [
+              Text('TOTAL CASH COUNTED', style: p.body(13, weight: FontWeight.w700)),
+              const Spacer(),
+              Text(money(_denomTotal), style: p.display(22, color: p.gold)),
+            ]),
+          ]))),
+          const SizedBox(width: 16),
+          // Expected vs actual + actions
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('EXPECTED vs ACTUAL CASH', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)),
+              const SizedBox(height: 16),
+              _eodBar(p, 'Expected', cashCollected, cashCollected),
+              const SizedBox(height: 10),
+              _eodBar(p, 'Actual (Counted)', _denomTotal, cashCollected),
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Variance', style: p.body(12.5, color: p.textMuted)),
+                  const SizedBox(height: 3),
+                  Text(
+                    _denomTotal == 0 ? '—' : money((_denomTotal - cashCollected).abs()),
+                    style: p.body(15, weight: FontWeight.w700, color: _denomTotal == cashCollected ? p.success : p.danger),
+                  ),
+                ])),
+                if (_denomTotal > 0) StatusChip(
+                  label: _denomTotal == cashCollected ? 'Balanced' : _denomTotal > cashCollected ? 'Overage' : 'Shortage',
+                  color: _denomTotal == cashCollected ? p.success : p.danger,
+                ),
+              ]),
+            ])),
+            const SizedBox(height: 12),
+            Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('DAY SUMMARY', style: p.body(11, color: p.textMuted, weight: FontWeight.w700, spacing: 1.0)),
+              const SizedBox(height: 12),
+              _eodRow(p, 'Date', prettyDate(today)),
+              _eodRow(p, 'Total Invoices', '$txCount'),
+              _eodRow(p, 'Gross Revenue', money(grossSales)),
+              _eodRow(p, 'Cash Collected', money(cashCollected)),
+              _eodRow(p, 'Outstanding', money(pendingBalance), danger: pendingBalance > 0),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(child: GhostButton(label: 'Print Z-Report', icon: Icons.print_outlined, onTap: () => toast(context, 'Z-Report sent to printer'))),
+                const SizedBox(width: 10),
+                Expanded(child: GoldButton(label: 'Close Day', icon: Icons.check_circle_outline, onTap: () => toast(context, 'Day closed successfully — have a great evening!'))),
+              ]),
+            ])),
+          ])),
+        ]),
+      ]),
+    )));
+  }
+
+  Widget _eodRow(AppPalette p, String label, String value, {bool danger = false}) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 7),
+    child: Row(children: [
+      Expanded(child: Text(label, style: p.body(13, color: p.textMuted))),
+      Text(value, style: p.body(14, weight: FontWeight.w700, color: danger ? Colors.orange.shade400 : p.text)),
+    ]),
+  );
+
+  Widget _eodBar(AppPalette p, String label, double value, double max) {
+    final pct = max > 0 ? (value / max).clamp(0.0, 1.0) : 0.0;
+    final color = label.contains('Actual') ? p.info : p.gold;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: Text(label, style: p.body(12, color: p.textMuted))),
+        Text(money(value), style: p.body(12.5, weight: FontWeight.w600)),
+      ]),
+      const SizedBox(height: 5),
+      LayoutBuilder(builder: (ctx, c) => Stack(children: [
+        Container(height: 12, decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(6))),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 600),
+          height: 12, width: c.maxWidth * pct,
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(6)),
+        ),
+      ])),
+    ]);
+  }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// INVOICE RECEIPT DIALOG
+// ══════════════════════════════════════════════════════════════════════════════
 class InvoiceReceiptDialog extends StatelessWidget {
   final Invoice invoice;
   final VoidCallback? onPaymentRecorded;

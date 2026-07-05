@@ -11,7 +11,7 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProviderStateMixin {
   late final TabController _tab;
   @override
-  void initState() { super.initState(); _tab = TabController(length: 4, vsync: this); }
+  void initState() { super.initState(); _tab = TabController(length: 7, vsync: this); }
   @override
   void dispose() { _tab.dispose(); super.dispose(); }
 
@@ -20,7 +20,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     final p = pal(context);
     return ScreenScaffold(
       title: 'INVENTORY',
-      subtitle: 'Stock management, movements, transfers & audit',
+      subtitle: 'Stock management, movements, transfers, consumption, returns & audit',
       actions: [
         Container(height: 42,
           decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
@@ -28,11 +28,17 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
             indicatorColor: p.gold, indicatorSize: TabBarIndicatorSize.label,
             labelStyle: p.body(12.5, weight: FontWeight.w600), unselectedLabelStyle: p.body(12.5),
             labelColor: p.gold, unselectedLabelColor: p.textMuted, tabAlignment: TabAlignment.start,
-            tabs: const [Tab(text: 'Dashboard'), Tab(text: 'Stock List'), Tab(text: 'Movements'), Tab(text: 'Audit')]),
+            tabs: const [
+              Tab(text: 'Dashboard'), Tab(text: 'Stock List'), Tab(text: 'Movements'),
+              Tab(text: 'Stock Transfer'), Tab(text: 'Consumption'), Tab(text: 'Returns'),
+              Tab(text: 'Audit'),
+            ]),
         ),
       ],
-      child: TabBarView(controller: _tab, children: const [
-        _DashboardTab(), _StockListTab(), _MovementsTab(), _AuditTab(),
+      child: EagerTabBarView(controller: _tab, children: const [
+        _DashboardTab(), _StockListTab(), _MovementsTab(),
+        _TransferTab(), _ConsumptionTab(), _ReturnsTab(),
+        _AuditTab(),
       ]),
     );
   }
@@ -543,6 +549,414 @@ class _AuditSheetState extends State<_AuditSheet> {
               ],
             )).toList(),
           )))))),
+    ]);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STOCK TRANSFER TAB
+// ══════════════════════════════════════════════════════════════════════════════
+class _TransferEntry {
+  final String date, product, from, to, transferredBy;
+  final int qty;
+  final String notes;
+  _TransferEntry({required this.date, required this.product, required this.from, required this.to, required this.qty, required this.transferredBy, this.notes = ''});
+}
+
+class _TransferTab extends StatefulWidget {
+  const _TransferTab();
+  @override
+  State<_TransferTab> createState() => _TransferTabState();
+}
+
+class _TransferTabState extends State<_TransferTab> {
+  static const _locations = ['Main Store', 'Branch 1', 'Branch 2'];
+  final _history = <_TransferEntry>[
+    _TransferEntry(date: '1 Jul 2026', product: 'PRP Kit', from: 'Main Store', to: 'Branch 1', qty: 5, transferredBy: 'Admin'),
+    _TransferEntry(date: '28 Jun 2026', product: 'Hair Serum', from: 'Main Store', to: 'Branch 2', qty: 10, transferredBy: 'Manager'),
+  ];
+
+  StockItem? _selectedProduct;
+  String _fromLoc = 'Main Store';
+  String _toLoc = 'Branch 1';
+  int _qty = 1;
+  DateTime _date = DateTime.now();
+  final _notesCtrl = TextEditingController();
+  final _byCtrl = TextEditingController(text: 'Admin');
+
+  @override
+  void dispose() { _notesCtrl.dispose(); _byCtrl.dispose(); super.dispose(); }
+
+  void _transfer() {
+    if (_selectedProduct == null) { toast(context, 'Select a product'); return; }
+    if (_fromLoc == _toLoc) { toast(context, 'From and To locations must differ'); return; }
+    if (_qty <= 0 || _qty > _selectedProduct!.currentQty) { toast(context, 'Insufficient stock'); return; }
+    setState(() {
+      _history.insert(0, _TransferEntry(
+        date: prettyShort(_date), product: _selectedProduct!.name,
+        from: _fromLoc, to: _toLoc, qty: _qty,
+        transferredBy: _byCtrl.text.isEmpty ? 'Admin' : _byCtrl.text,
+        notes: _notesCtrl.text,
+      ));
+      _selectedProduct!.currentQty -= _qty;
+      _notesCtrl.clear();
+      _qty = 1;
+    });
+    appState.touch();
+    toast(context, 'Transfer logged successfully');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('NEW STOCK TRANSFER', style: p.display(18, spacing: 0.5)),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: Dropdown2<String>(label: 'From Location', value: _fromLoc,
+            items: _locations.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+            onChanged: (v) => setState(() => _fromLoc = v ?? _fromLoc))),
+          const SizedBox(width: 14),
+          Expanded(child: Dropdown2<String>(label: 'To Location', value: _toLoc,
+            items: _locations.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+            onChanged: (v) => setState(() => _toLoc = v ?? _toLoc))),
+          const SizedBox(width: 14),
+          Expanded(child: Dropdown2<StockItem?>(label: 'Product', value: _selectedProduct,
+            items: [const DropdownMenuItem<StockItem?>(value: null, child: Text('— Select —')),
+              ...appState.stockItems.map((i) => DropdownMenuItem(value: i, child: Text('${i.name} (${i.currentQty} ${i.unit})')))],
+            onChanged: (v) => setState(() => _selectedProduct = v))),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('QUANTITY', style: p.body(11, weight: FontWeight.w700, spacing: 1.0, color: p.textMuted)),
+            const SizedBox(height: 8),
+            Row(children: [
+              QtyButton(Icons.remove, () => setState(() { if (_qty > 1) _qty--; })),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text('$_qty', style: p.display(18))),
+              QtyButton(Icons.add, () => setState(() => _qty++)),
+            ]),
+          ]),
+          const SizedBox(width: 20),
+          Expanded(child: FormField2(label: 'Transferred By', controller: _byCtrl, hint: 'Staff name')),
+          const SizedBox(width: 14),
+          Expanded(child: FormField2(label: 'Notes', controller: _notesCtrl, hint: 'Remarks…')),
+        ]),
+        const SizedBox(height: 18),
+        Row(children: [
+          const Spacer(),
+          GoldButton(label: 'Transfer Stock', icon: Icons.swap_horiz_rounded, onTap: _transfer),
+        ]),
+      ])),
+      const SizedBox(height: 20),
+      Panel(padding: EdgeInsets.zero, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.all(16), child: Text('TRANSFER HISTORY', style: p.display(16, spacing: 0.5))),
+        _history.isEmpty
+          ? Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('No transfers recorded.', style: p.body(13, color: p.textMuted))))
+          : FullWidthDataTable(child: DataTable(
+            headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+            columnSpacing: 16, horizontalMargin: 20,
+            columns: ['Date', 'Product', 'From', 'To', 'Qty', 'By', 'Notes']
+              .map((c) => DataColumn(label: Text(c, style: p.body(12, weight: FontWeight.w700)))).toList(),
+            rows: _history.map((t) => DataRow(cells: [
+              DataCell(Text(t.date, style: p.body(12.5, color: p.textMuted))),
+              DataCell(Text(t.product, style: p.body(13, weight: FontWeight.w600))),
+              DataCell(StatusChip(label: t.from, color: p.info)),
+              DataCell(StatusChip(label: t.to, color: p.warning)),
+              DataCell(Text('${t.qty}', style: p.body(13, weight: FontWeight.w700, color: p.gold))),
+              DataCell(Text(t.transferredBy, style: p.body(12.5))),
+              DataCell(Text(t.notes.isEmpty ? '—' : t.notes, style: p.body(12, color: p.textMuted))),
+            ])).toList(),
+          )),
+      ])),
+    ])));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STOCK CONSUMPTION TAB
+// ══════════════════════════════════════════════════════════════════════════════
+class _ConsumptionEntry {
+  final String date, product, purpose, staff;
+  final int qty;
+  final double costPerUnit;
+  _ConsumptionEntry({required this.date, required this.product, required this.qty, required this.purpose, required this.staff, required this.costPerUnit});
+  double get totalCost => qty * costPerUnit;
+}
+
+class _ConsumptionTab extends StatefulWidget {
+  const _ConsumptionTab();
+  @override
+  State<_ConsumptionTab> createState() => _ConsumptionTabState();
+}
+
+class _ConsumptionTabState extends State<_ConsumptionTab> {
+  static const _purposes = ['Treatment', 'Cleaning', 'Demo', 'Training', 'Other'];
+
+  final _entries = <_ConsumptionEntry>[
+    _ConsumptionEntry(date: '3 Jul 2026', product: 'PRP Kit', qty: 2, purpose: 'Treatment', staff: 'Dr. Rashid', costPerUnit: 4500),
+    _ConsumptionEntry(date: '3 Jul 2026', product: 'Hair Serum', qty: 1, purpose: 'Treatment', staff: 'Dr. Sara', costPerUnit: 1200),
+    _ConsumptionEntry(date: '2 Jul 2026', product: 'Surgical Gloves', qty: 10, purpose: 'Treatment', staff: 'Nurse Hina', costPerUnit: 15),
+    _ConsumptionEntry(date: '1 Jul 2026', product: 'Cleaning Solution', qty: 3, purpose: 'Cleaning', staff: 'Housekeeper', costPerUnit: 350),
+  ];
+
+  void _logConsumption() {
+    final p = appState.palette;
+    StockItem? selected;
+    String purpose = 'Treatment';
+    int qty = 1;
+    final staffCtrl = TextEditingController(text: 'Admin');
+    DateTime date = DateTime.now();
+
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(width: 520, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('LOG CONSUMPTION', style: p.display(22, spacing: 1.0)),
+          const SizedBox(height: 20),
+          Dropdown2<StockItem?>(label: 'Product *', value: selected,
+            items: [const DropdownMenuItem<StockItem?>(value: null, child: Text('— Select Product —')),
+              ...appState.stockItems.map((i) => DropdownMenuItem(value: i, child: Text('${i.name} (${i.currentQty} ${i.unit})')))],
+            onChanged: (v) => ss(() => selected = v)),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: Dropdown2<String>(label: 'Purpose', value: purpose,
+              items: _purposes.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+              onChanged: (v) => ss(() => purpose = v ?? purpose))),
+            const SizedBox(width: 14),
+            Expanded(child: FormField2(label: 'Staff Member', controller: staffCtrl, hint: 'Name')),
+          ]),
+          const SizedBox(height: 14),
+          Row(children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('QUANTITY', style: p.body(11, weight: FontWeight.w700, spacing: 1.0, color: p.textMuted)),
+              const SizedBox(height: 8),
+              Row(children: [
+                QtyButton(Icons.remove, () => ss(() { if (qty > 1) qty--; })),
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text('$qty', style: p.display(18))),
+                QtyButton(Icons.add, () => ss(() => qty++)),
+              ]),
+            ]),
+            const SizedBox(width: 20),
+            Expanded(child: _InvDatePicker(label: 'Date', value: date, palette: p, onPick: (d) => ss(() => date = d))),
+          ]),
+          const SizedBox(height: 24),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
+            const SizedBox(width: 12),
+            GoldButton(label: 'Log', onTap: () {
+              if (selected == null) return;
+              setState(() {
+                _entries.insert(0, _ConsumptionEntry(
+                  date: prettyShort(date), product: selected!.name,
+                  qty: qty, purpose: purpose, staff: staffCtrl.text,
+                  costPerUnit: selected!.costPrice,
+                ));
+                if (selected!.currentQty >= qty) selected!.currentQty -= qty;
+              });
+              appState.touch();
+              Navigator.pop(ctx);
+              toast(context, 'Consumption logged');
+            }),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    final now = DateTime.now();
+    final todayEntries = _entries.where((e) => e.date == prettyShort(now)).toList();
+    final todayCost = todayEntries.fold(0.0, (s, e) => s + e.totalCost);
+    final monthCost = _entries.fold(0.0, (s, e) => s + e.totalCost);
+    final productCounts = <String, int>{};
+    for (final e in _entries) productCounts[e.product] = (productCounts[e.product] ?? 0) + e.qty;
+    final topProduct = productCounts.isEmpty ? '—' : productCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+
+    return Column(children: [
+      MetricRow([
+        MetricCard(title: "Today's Consumption Cost", value: money(todayCost), icon: Icons.today_outlined, delta: '${todayEntries.length} entries'),
+        MetricCard(title: 'Most Consumed Product', value: topProduct, icon: Icons.star_outline_rounded, delta: ''),
+        MetricCard(title: 'Total Cost This Month', value: money(monthCost), icon: Icons.calendar_month_outlined, delta: '${_entries.length} entries'),
+      ]),
+      const SizedBox(height: 12),
+      Row(children: [const Spacer(), GoldButton(label: 'Log Consumption', icon: Icons.add, onTap: _logConsumption)]),
+      const SizedBox(height: 12),
+      Expanded(child: Panel(padding: EdgeInsets.zero, child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc,
+        child: FullWidthDataTable(child: DataTable(
+          headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+          columnSpacing: 16, horizontalMargin: 20,
+          columns: ['Date', 'Product', 'Qty Used', 'Purpose', 'Staff', 'Cost/Unit', 'Total Cost']
+            .map((c) => DataColumn(label: Text(c, style: p.body(12, weight: FontWeight.w700)))).toList(),
+          rows: _entries.map((e) => DataRow(cells: [
+            DataCell(Text(e.date, style: p.body(12.5, color: p.textMuted))),
+            DataCell(Text(e.product, style: p.body(13, weight: FontWeight.w600))),
+            DataCell(Text('${e.qty}', style: p.body(13, weight: FontWeight.w700, color: p.danger))),
+            DataCell(StatusChip(label: e.purpose, color: p.info)),
+            DataCell(Text(e.staff, style: p.body(12.5))),
+            DataCell(Text(money(e.costPerUnit), style: p.body(12.5, color: p.textMuted))),
+            DataCell(Text(money(e.totalCost), style: p.body(13, weight: FontWeight.w700, color: p.gold))),
+          ])).toList(),
+        )))))),
+    ]);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STOCK RETURNS TAB
+// ══════════════════════════════════════════════════════════════════════════════
+class _ReturnEntry {
+  final String id, product;
+  final int qty;
+  final String reason, notes;
+  String status; // Pending / Processed / Credited
+  final String date;
+  _ReturnEntry({required this.id, required this.date, required this.product, required this.qty, required this.reason, this.notes = '', this.status = 'Pending'});
+}
+
+class _ReturnsTab extends StatefulWidget {
+  const _ReturnsTab();
+  @override
+  State<_ReturnsTab> createState() => _ReturnsTabState();
+}
+
+class _ReturnsTabState extends State<_ReturnsTab> {
+  static const _reasons = ['Defective', 'Wrong Item', 'Unused', 'Expired', 'Overstock'];
+
+  final _returns = <_ReturnEntry>[
+    _ReturnEntry(id: 'RET-001', date: '2 Jul 2026', product: 'Hair Serum', qty: 2, reason: 'Defective', status: 'Processed'),
+    _ReturnEntry(id: 'RET-002', date: '3 Jul 2026', product: 'PRP Vials', qty: 1, reason: 'Wrong Item', status: 'Pending'),
+  ];
+
+  int _nextId = 3;
+
+  void _addReturn() {
+    final p = appState.palette;
+    StockItem? selected;
+    String reason = 'Defective';
+    int qty = 1;
+    final notesCtrl = TextEditingController();
+
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, ss) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(width: 500, padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(color: p.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.border)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('ADD STOCK RETURN', style: p.display(22, spacing: 1.0)),
+          const SizedBox(height: 20),
+          Dropdown2<StockItem?>(label: 'Product *', value: selected,
+            items: [const DropdownMenuItem<StockItem?>(value: null, child: Text('— Select Product —')),
+              ...appState.stockItems.map((i) => DropdownMenuItem(value: i, child: Text(i.name)))],
+            onChanged: (v) => ss(() => selected = v)),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: Dropdown2<String>(label: 'Reason', value: reason,
+              items: _reasons.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+              onChanged: (v) => ss(() => reason = v ?? reason))),
+            const SizedBox(width: 14),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('QUANTITY', style: p.body(11, weight: FontWeight.w700, spacing: 1.0, color: p.textMuted)),
+              const SizedBox(height: 8),
+              Row(children: [
+                QtyButton(Icons.remove, () => ss(() { if (qty > 1) qty--; })),
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: Text('$qty', style: p.display(18))),
+                QtyButton(Icons.add, () => ss(() => qty++)),
+              ]),
+            ]),
+          ]),
+          const SizedBox(height: 14),
+          FormField2(label: 'Notes', controller: notesCtrl, hint: 'Additional details…', maxLines: 2),
+          const SizedBox(height: 24),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            GhostButton(label: 'Cancel', onTap: () => Navigator.pop(ctx)),
+            const SizedBox(width: 12),
+            GoldButton(label: 'Submit Return', onTap: () {
+              if (selected == null) return;
+              setState(() {
+                _returns.insert(0, _ReturnEntry(
+                  id: 'RET-${_nextId.toString().padLeft(3, '0')}',
+                  date: prettyShort(DateTime.now()),
+                  product: selected!.name, qty: qty,
+                  reason: reason, notes: notesCtrl.text,
+                ));
+                _nextId++;
+              });
+              Navigator.pop(ctx);
+              toast(context, 'Return submitted');
+            }),
+          ]),
+        ]),
+      ),
+    )));
+  }
+
+  Color _statusColor(AppPalette p, String s) => switch (s) {
+    'Processed' => p.success, 'Credited' => p.info, _ => p.warning,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pal(context);
+    return Column(children: [
+      Row(children: [const Spacer(), GoldButton(label: 'Add Return', icon: Icons.undo_rounded, onTap: _addReturn)]),
+      const SizedBox(height: 12),
+      Expanded(child: _returns.isEmpty
+        ? Center(child: Text('No returns recorded.', style: p.body(13, color: p.textMuted)))
+        : Panel(padding: EdgeInsets.zero, child: ScrollArea(builder: (sc) => SingleChildScrollView(controller: sc,
+            child: FullWidthDataTable(child: DataTable(
+              headingRowColor: WidgetStateProperty.all(p.surfaceAlt),
+              columnSpacing: 16, horizontalMargin: 20,
+              columns: ['Date', 'Return ID', 'Product', 'Qty', 'Reason', 'Status', 'Action']
+                .map((c) => DataColumn(label: Text(c, style: p.body(12, weight: FontWeight.w700)))).toList(),
+              rows: _returns.map((r) => DataRow(cells: [
+                DataCell(Text(r.date, style: p.body(12.5, color: p.textMuted))),
+                DataCell(Text(r.id, style: p.body(12.5, color: p.textMuted))),
+                DataCell(Text(r.product, style: p.body(13, weight: FontWeight.w600))),
+                DataCell(Text('${r.qty}', style: p.body(13, weight: FontWeight.w700, color: p.gold))),
+                DataCell(StatusChip(label: r.reason, color: p.warning)),
+                DataCell(StatusChip(label: r.status, color: _statusColor(p, r.status))),
+                DataCell(r.status != 'Pending' ? Text('—', style: p.body(12.5, color: p.textMuted))
+                  : GoldButton(label: 'Process', onTap: () {
+                    setState(() => r.status = 'Processed');
+                    // put qty back in stock
+                    final item = appState.stockItems.where((i) => i.name == r.product).firstOrNull;
+                    if (item != null) { item.currentQty += r.qty; appState.touch(); }
+                    toast(context, 'Return processed');
+                  })),
+              ])).toList(),
+            )))))),
+    ]);
+  }
+}
+
+// ── Shared date picker for inventory tabs ─────────────────────────────────────
+class _InvDatePicker extends StatelessWidget {
+  final String label;
+  final DateTime value;
+  final AppPalette palette;
+  final ValueChanged<DateTime> onPick;
+  const _InvDatePicker({required this.label, required this.value, required this.palette, required this.onPick});
+  @override
+  Widget build(BuildContext context) {
+    final p = palette;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: p.body(12, color: p.textMuted, weight: FontWeight.w600)),
+      const SizedBox(height: 7),
+      GestureDetector(
+        onTap: () async {
+          final picked = await showDatePicker(context: context, initialDate: value,
+            firstDate: DateTime(2020), lastDate: DateTime(2030),
+            builder: (ctx, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: ColorScheme.dark(primary: p.gold, surface: p.surface)), child: child!));
+          if (picked != null) onPick(picked);
+        },
+        child: Container(height: 46, padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8), border: Border.all(color: p.border)),
+          child: Row(children: [Icon(Icons.calendar_today_outlined, size: 15, color: p.gold), const SizedBox(width: 10), Text(prettyShort(value), style: p.body(13.5, weight: FontWeight.w500))])),
+      ),
     ]);
   }
 }
