@@ -15,10 +15,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl  = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
+  bool _googleLoading = false;
   String? _error;
 
   @override
   void dispose() { _emailCtrl.dispose(); _passCtrl.dispose(); super.dispose(); }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() { _googleLoading = true; _error = null; });
+    await Future.delayed(const Duration(milliseconds: 1400));
+    if (!mounted) return;
+    markLoggedIn();
+    context.go('/home');
+  }
 
   Future<void> _login() async {
     if (_emailCtrl.text.trim().isEmpty || _passCtrl.text.isEmpty) {
@@ -101,10 +110,13 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 8),
 
             GoldButton(label: 'SIGN IN', onTap: _login, loading: _loading),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             const DividerLabel(text: 'or'),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
+            GoogleButton(onTap: _signInWithGoogle, loading: _googleLoading),
+            const SizedBox(height: 28),
 
             // Register
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [

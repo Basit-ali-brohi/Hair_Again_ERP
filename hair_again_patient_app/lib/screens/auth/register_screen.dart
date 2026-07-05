@@ -16,6 +16,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passCtrl  = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
+  bool _googleLoading = false;
   String? _error;
   bool _agreed = false;
 
@@ -23,6 +24,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _nameCtrl.dispose(); _emailCtrl.dispose(); _phoneCtrl.dispose(); _passCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _signUpWithGoogle() async {
+    setState(() { _googleLoading = true; _error = null; });
+    await Future.delayed(const Duration(milliseconds: 1400));
+    if (!mounted) return;
+    context.go('/otp', extra: 'google@gmail.com');
   }
 
   Future<void> _register() async {
@@ -112,7 +120,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 28),
 
           GoldButton(label: 'CREATE ACCOUNT', onTap: _register, loading: _loading),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+
+          const DividerLabel(text: 'or'),
+          const SizedBox(height: 20),
+
+          GoogleButton(onTap: _signUpWithGoogle, loading: _googleLoading),
+          const SizedBox(height: 28),
 
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Text('Already have an account? ', style: kBody(14, color: kTextMuted)),

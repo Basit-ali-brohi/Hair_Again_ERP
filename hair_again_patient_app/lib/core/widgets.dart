@@ -555,3 +555,78 @@ class _ConfettiPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ConfettiPainter old) => old.progress != progress;
 }
+
+// ── Google sign-in button ───────────────────────────────────────────────────────
+class GoogleButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool loading;
+  const GoogleButton({super.key, required this.onTap, this.loading = false});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: loading ? null : () { HapticFeedback.lightImpact(); onTap(); },
+    child: Container(
+      height: 52,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFDDDDDD)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: loading
+        ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF4285F4))))
+        : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            SizedBox(width: 22, height: 22, child: CustomPaint(painter: _GoogleGPainter())),
+            const SizedBox(width: 12),
+            const Text('Continue with Google', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1F1F1F), letterSpacing: 0.1)),
+          ]),
+    ),
+  );
+}
+
+class _GoogleGPainter extends CustomPainter {
+  const _GoogleGPainter();
+
+  void _arc(Canvas canvas, Rect rect, Color color, double startDeg, double sweepDeg) =>
+    canvas.drawArc(
+      rect,
+      startDeg * math.pi / 180,
+      sweepDeg * math.pi / 180,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = rect.width * 0.185
+        ..strokeCap = StrokeCap.butt
+        ..color = color,
+    );
+
+  @override
+  void paint(Canvas canvas, Size sz) {
+    final cx = sz.width / 2, cy = sz.height / 2;
+    final r  = math.min(cx, cy);
+    final sw = r * 0.37;
+    final ar = r - sw / 2;
+    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: ar);
+
+    // Four colored arcs of the G (0°=right, clockwise)
+    _arc(canvas, rect, const Color(0xFFEA4335), -28, 82);   // Red  — top-right
+    _arc(canvas, rect, const Color(0xFF4285F4),  54, 152);  // Blue — left
+    _arc(canvas, rect, const Color(0xFFFBBC05), 206, 72);   // Yellow — bottom
+    _arc(canvas, rect, const Color(0xFF34A853), 278, 54);   // Green — bottom-right
+
+    // Blue G-bar: horizontal from center to right edge
+    canvas.drawLine(
+      Offset(cx, cy),
+      Offset(cx + ar + sw / 2, cy),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = sw
+        ..strokeCap = StrokeCap.butt
+        ..color = const Color(0xFF4285F4),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GoogleGPainter o) => false;
+}
