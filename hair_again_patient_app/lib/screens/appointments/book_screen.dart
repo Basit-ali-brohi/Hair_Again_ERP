@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets.dart';
+import '../../../core/app_data_service.dart';
 
 class BookAppointmentScreen extends StatefulWidget {
   const BookAppointmentScreen({super.key});
@@ -38,7 +39,26 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
   void _back() { if (_step > 0) setState(() => _step--); else Navigator.of(context).pop(); }
 
   void _confirm() {
+    if (_service == null || _doctor == null || _date == null || _slot == null) return;
     HapticFeedback.heavyImpact();
+    // Build date+time from date + slot string
+    final timeParts = _slot!.replaceAll(' AM', '').replaceAll(' PM', '').split(':');
+    var hour = int.parse(timeParts[0]);
+    final minute = int.parse(timeParts[1]);
+    if (_slot!.contains('PM') && hour != 12) hour += 12;
+    if (_slot!.contains('AM') && hour == 12) hour = 0;
+    final apptDateTime = DateTime(_date!.year, _date!.month, _date!.day, hour, minute);
+
+    appData.bookAppointment(HaAppointment(
+      id: 'a_${DateTime.now().millisecondsSinceEpoch}',
+      title: _service!,
+      doctor: _doctor!,
+      dateTime: apptDateTime,
+      slot: _slot!,
+      status: 'Confirmed',
+    ));
+    appData.addLoyaltyPoints(50);
+
     setState(() => _confirmed = true);
     Future.delayed(const Duration(milliseconds: 3400), () {
       if (mounted) context.go('/appointments');
