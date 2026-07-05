@@ -306,7 +306,7 @@ class _UpcomingCard extends StatelessWidget {
       ),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Hair Transplant Consultation', style: p.body(14, weight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text('Hair Transplant Consultation', style: p.body(14, weight: FontWeight.w700), maxLines: 2, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 3),
         Text('Dr. Bilal Khan', style: p.body(12, color: p.textMuted)),
         const SizedBox(height: 3),
