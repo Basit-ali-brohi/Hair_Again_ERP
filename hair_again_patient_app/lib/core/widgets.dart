@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme.dart';
@@ -226,4 +227,331 @@ class AnimatedCounter extends StatelessWidget {
       style: style,
     ),
   );
+}
+
+// ── Shimmer loading block ───────────────────────────────────────────────────────
+class ShimmerBox extends StatefulWidget {
+  final double? width;
+  final double? height;
+  final double radius;
+  const ShimmerBox({super.key, this.width, this.height, this.radius = 10});
+
+  @override
+  State<ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<ShimmerBox> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final t = _ctrl.value;
+        return Container(
+          width: widget.width,
+          height: widget.height ?? 14,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.radius),
+            gradient: LinearGradient(
+              begin: Alignment(-2.0 + t * 4, 0),
+              end:   Alignment(-1.0 + t * 4, 0),
+              colors: p.isDark
+                  ? [
+                      Colors.white.withValues(alpha: 0.04),
+                      Colors.white.withValues(alpha: 0.12),
+                      Colors.white.withValues(alpha: 0.04),
+                    ]
+                  : [
+                      const Color(0xFFECE6DA),
+                      kGold.withValues(alpha: 0.18),
+                      const Color(0xFFECE6DA),
+                    ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Skeleton card matching the home-screen appointment/promo card shape
+class ShimmerCard extends StatelessWidget {
+  final double height;
+  const ShimmerCard({super.key, this.height = 90});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
+    return Container(
+      height: height,
+      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: p.border),
+      ),
+      child: Row(children: [
+        ShimmerBox(width: 52, height: 52, radius: 15),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+          ShimmerBox(width: double.infinity, height: 13, radius: 7),
+          const SizedBox(height: 10),
+          ShimmerBox(width: 110, height: 11, radius: 6),
+          const SizedBox(height: 8),
+          ShimmerBox(width: 160, height: 10, radius: 6),
+        ])),
+      ]),
+    );
+  }
+}
+
+// Skeleton tile matching service list items
+class ShimmerTile extends StatelessWidget {
+  const ShimmerTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: p.border),
+      ),
+      child: Row(children: [
+        ShimmerBox(width: 48, height: 48, radius: 14),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ShimmerBox(width: 140, height: 13, radius: 7),
+          const SizedBox(height: 9),
+          ShimmerBox(width: double.infinity, height: 11, radius: 6),
+          const SizedBox(height: 9),
+          ShimmerBox(width: 80, height: 10, radius: 6),
+        ])),
+      ]),
+    );
+  }
+}
+
+// ── Before/After drag slider ────────────────────────────────────────────────────
+class BeforeAfterSlider extends StatefulWidget {
+  final Widget before;
+  final Widget after;
+  final double height;
+  final double initialSplit;
+  const BeforeAfterSlider({
+    super.key,
+    required this.before,
+    required this.after,
+    this.height = 300,
+    this.initialSplit = 0.40,
+  });
+
+  @override
+  State<BeforeAfterSlider> createState() => _BeforeAfterSliderState();
+}
+
+class _BeforeAfterSliderState extends State<BeforeAfterSlider> {
+  late double _split;
+
+  @override
+  void initState() { super.initState(); _split = widget.initialSplit; }
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(20),
+    child: SizedBox(
+      height: widget.height,
+      child: LayoutBuilder(builder: (_, constraints) {
+        final w = constraints.maxWidth;
+        final divX = w * _split;
+        return GestureDetector(
+          onHorizontalDragUpdate: (d) {
+            HapticFeedback.selectionClick();
+            setState(() => _split = (_split + d.delta.dx / w).clamp(0.05, 0.95));
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Stack(children: [
+            // After — full background
+            Positioned.fill(child: widget.after),
+            // Before — left clip
+            Positioned.fill(
+              child: ClipRect(
+                clipper: _FractionClipper(_split),
+                child: widget.before,
+              ),
+            ),
+            // Divider line
+            Positioned(left: divX - 0.75, top: 0, bottom: 0, width: 1.5,
+              child: Container(color: Colors.white.withValues(alpha: 0.9))),
+            // Handle
+            Positioned(
+              left: divX - 20, top: 0, bottom: 0,
+              child: Center(
+                child: Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: kGoldGradient,
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 2)),
+                      BoxShadow(color: kGold.withValues(alpha: 0.45), blurRadius: 14),
+                    ],
+                  ),
+                  child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.chevron_left_rounded, color: Colors.black87, size: 16),
+                    Icon(Icons.chevron_right_rounded, color: Colors.black87, size: 16),
+                  ]),
+                ),
+              ),
+            ),
+            // Labels
+            Positioned(left: 12, bottom: 12,
+              child: _SliderLabel(text: 'Before', dark: true)),
+            Positioned(right: 12, bottom: 12,
+              child: _SliderLabel(text: 'After', gold: true)),
+          ]),
+        );
+      }),
+    ),
+  );
+}
+
+class _SliderLabel extends StatelessWidget {
+  final String text;
+  final bool dark;
+  final bool gold;
+  const _SliderLabel({required this.text, this.dark = false, this.gold = false});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      gradient: gold ? kGoldGradient : null,
+      color: dark ? Colors.black.withValues(alpha: 0.55) : null,
+      borderRadius: BorderRadius.circular(7),
+    ),
+    child: Text(text, style: TextStyle(
+      color: gold ? Colors.black87 : Colors.white,
+      fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.3,
+    )),
+  );
+}
+
+class _FractionClipper extends CustomClipper<Rect> {
+  final double fraction;
+  const _FractionClipper(this.fraction);
+  @override
+  Rect getClip(Size size) => Rect.fromLTWH(0, 0, size.width * fraction, size.height);
+  @override
+  bool shouldReclip(_FractionClipper old) => old.fraction != fraction;
+}
+
+// ── Gold confetti burst ─────────────────────────────────────────────────────────
+class _Particle {
+  final double startX, speed, swing, phase, freq, spin, w, h;
+  final Color color;
+  const _Particle({
+    required this.startX, required this.speed, required this.swing,
+    required this.phase, required this.freq, required this.spin,
+    required this.w, required this.h, required this.color,
+  });
+}
+
+class ConfettiOverlay extends StatefulWidget {
+  final VoidCallback? onDone;
+  const ConfettiOverlay({super.key, this.onDone});
+
+  @override
+  State<ConfettiOverlay> createState() => _ConfettiOverlayState();
+}
+
+class _ConfettiOverlayState extends State<ConfettiOverlay> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final List<_Particle> _particles;
+
+  static const _palette = [
+    kGold, Color(0xFFFFE168), Colors.white, Color(0xFFD4AF5B),
+    Color(0xFFFFF0A0), Color(0xFFE8C76A),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final rng = math.Random();
+    _particles = List.generate(90, (_) => _Particle(
+      startX: rng.nextDouble(),
+      speed:  0.55 + rng.nextDouble() * 0.85,
+      swing:  18 + rng.nextDouble() * 32,
+      phase:  rng.nextDouble() * math.pi * 2,
+      freq:   2.0 + rng.nextDouble() * 3.5,
+      spin:   (rng.nextBool() ? 1 : -1) * (4 + rng.nextDouble() * 8),
+      w:      5 + rng.nextDouble() * 6,
+      h:      3 + rng.nextDouble() * 4,
+      color:  _palette[rng.nextInt(_palette.length)],
+    ));
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))
+      ..forward().whenComplete(() => widget.onDone?.call());
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => CustomPaint(
+        size: MediaQuery.of(context).size,
+        painter: _ConfettiPainter(_ctrl.value, _particles),
+      ),
+    ),
+  );
+}
+
+class _ConfettiPainter extends CustomPainter {
+  final double progress;
+  final List<_Particle> particles;
+  const _ConfettiPainter(this.progress, this.particles);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    for (final pt in particles) {
+      final rawY = progress * size.height * (1.1 + pt.speed) - size.height * 0.12;
+      if (rawY < -24 || rawY > size.height + 24) continue;
+      final x = pt.startX * size.width + math.sin(progress * pt.freq + pt.phase) * pt.swing;
+      final fadeIn  = (rawY / (size.height * 0.12)).clamp(0.0, 1.0);
+      final fadeOut = 1.0 - ((rawY - size.height * 0.62) / (size.height * 0.38)).clamp(0.0, 1.0);
+      final opacity = (fadeIn * fadeOut).clamp(0.0, 1.0);
+      if (opacity <= 0.01) continue;
+      paint.color = pt.color.withValues(alpha: opacity);
+      canvas.save();
+      canvas.translate(x, rawY);
+      canvas.rotate(progress * pt.spin);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: pt.w, height: pt.h), const Radius.circular(1)),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter old) => old.progress != progress;
 }

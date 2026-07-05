@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets.dart';
@@ -15,6 +16,7 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
   String? _doctor;
   DateTime? _date;
   String? _slot;
+  bool _confirmed = false;
 
   static const _services = [
     ('Hair Transplant Consultation', Icons.person_outlined,  'Rs 1,500'),
@@ -36,26 +38,18 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
   void _back() { if (_step > 0) setState(() => _step--); else Navigator.of(context).pop(); }
 
   void _confirm() {
-    final p = HaTheme.of(context);
-    showDialog(context: context, builder: (_) => AlertDialog(
-      backgroundColor: p.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.check_circle, color: kSuccess, size: 56),
-        const SizedBox(height: 16),
-        Text('Appointment Confirmed!', style: p.display(20), textAlign: TextAlign.center),
-        const SizedBox(height: 8),
-        Text('You\'ll receive a confirmation SMS & email shortly.', style: p.body(13, color: p.textMuted), textAlign: TextAlign.center),
-        const SizedBox(height: 24),
-        GoldButton(label: 'View Appointments', onTap: () { Navigator.pop(context); context.go('/appointments'); }),
-      ]),
-    ));
+    HapticFeedback.heavyImpact();
+    setState(() => _confirmed = true);
+    Future.delayed(const Duration(milliseconds: 3400), () {
+      if (mounted) context.go('/appointments');
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final p = HaTheme.of(context);
-    return Scaffold(
+    return Stack(children: [
+      Scaffold(
       backgroundColor: p.bg,
       appBar: KAppBar(title: 'Book Appointment'),
       body: Column(children: [
@@ -111,7 +105,14 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
           ]),
         ),
       ]),
-    );
+      ), // end Scaffold
+      // ── Confetti + success overlay ─────────────────────────────────────────
+      if (_confirmed) ...[
+        Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.72))),
+        const ConfettiOverlay(),
+        Center(child: _SuccessCard(p: p, onTap: () => context.go('/appointments'))),
+      ],
+    ]); // end Stack
   }
 
   Widget _step0(AppPalette p) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -281,4 +282,42 @@ class _ConfirmRow extends StatelessWidget {
     const Spacer(),
     Flexible(child: Text(value, style: p.body(14, weight: FontWeight.w600), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
   ]);
+}
+
+// ── Booking success card ────────────────────────────────────────────────────────
+class _SuccessCard extends StatelessWidget {
+  final AppPalette p;
+  final VoidCallback onTap;
+  const _SuccessCard({required this.p, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 32),
+    child: Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: kGold.withValues(alpha: 0.30)),
+        boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.18), blurRadius: 40, offset: const Offset(0, 12))],
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 72, height: 72,
+          decoration: BoxDecoration(
+            gradient: kGoldGradient,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.4), blurRadius: 20)],
+          ),
+          child: const Icon(Icons.check_rounded, color: Colors.black87, size: 36),
+        ),
+        const SizedBox(height: 20),
+        Text('Booked!', style: p.display(26), textAlign: TextAlign.center),
+        const SizedBox(height: 8),
+        Text('Your appointment is confirmed.\nSMS & email on the way.', style: p.body(13, color: p.textMuted), textAlign: TextAlign.center),
+        const SizedBox(height: 24),
+        GoldButton(label: 'View Appointments', onTap: onTap),
+      ]),
+    ),
+  );
 }

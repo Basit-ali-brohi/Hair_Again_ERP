@@ -17,6 +17,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _gradCtrl;
+  bool _loading = true;
 
   static const _quickActions = [
     (Icons.calendar_month_rounded, 'Book', '/book'),
@@ -30,6 +31,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     _gradCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 6))
       ..repeat(reverse: true);
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _loading = false);
+    });
   }
 
   @override
@@ -48,7 +52,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     return Scaffold(
       backgroundColor: p.bg,
-      body: CustomScrollView(
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 500),
+        switchInCurve: Curves.easeOut,
+        child: _loading
+          ? _ShimmerBody(key: const ValueKey('shimmer'), p: p, topPad: topPad)
+          : CustomScrollView(key: const ValueKey('content'),
         physics: const BouncingScrollPhysics(),
         slivers: [
           // ── Animated gradient hero ──────────────────────────────────────────
@@ -125,7 +134,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ])),
           ),
         ],
-      ),
+      ), // end CustomScrollView
+      ), // end AnimatedSwitcher
     );
   }
 }
@@ -425,6 +435,79 @@ class _ServiceTile extends StatelessWidget {
           child: const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: kGold),
         ),
       ]),
+    ]),
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Shimmer skeleton — shown for ~1.6 s before real content fades in
+// ──────────────────────────────────────────────────────────────────────────────
+class _ShimmerBody extends StatelessWidget {
+  final AppPalette p;
+  final double topPad;
+  const _ShimmerBody({super.key, required this.p, required this.topPad});
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    physics: const NeverScrollableScrollPhysics(),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Hero skeleton
+      Container(
+        padding: EdgeInsets.fromLTRB(20, topPad + 18, 20, 28),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              ShimmerBox(width: 100, height: 12, radius: 6),
+              const SizedBox(height: 8),
+              ShimmerBox(width: 160, height: 22, radius: 8),
+            ]),
+            const Spacer(),
+            ShimmerBox(width: 44, height: 44, radius: 22),
+            const SizedBox(width: 10),
+            ShimmerBox(width: 44, height: 44, radius: 22),
+          ]),
+          const SizedBox(height: 22),
+          Row(children: [
+            Expanded(child: ShimmerBox(height: 62, radius: 14)),
+            const SizedBox(width: 10),
+            Expanded(child: ShimmerBox(height: 62, radius: 14)),
+            const SizedBox(width: 10),
+            Expanded(child: ShimmerBox(height: 62, radius: 14)),
+          ]),
+          const SizedBox(height: 22),
+          Row(children: List.generate(4, (i) => Expanded(child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Column(children: [
+              ShimmerBox(width: 58, height: 58, radius: 18),
+              const SizedBox(height: 8),
+              ShimmerBox(width: 40, height: 10, radius: 5),
+            ]),
+          )))),
+        ]),
+      ),
+      // Body skeleton
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ShimmerBox(width: 180, height: 14, radius: 7),
+          const SizedBox(height: 14),
+          const ShimmerCard(height: 86),
+          const SizedBox(height: 28),
+          ShimmerBox(width: 160, height: 14, radius: 7),
+          const SizedBox(height: 14),
+          const ShimmerCard(height: 110),
+          const SizedBox(height: 28),
+          Row(children: [
+            ShimmerBox(width: 140, height: 14, radius: 7),
+            const Spacer(),
+            ShimmerBox(width: 50, height: 12, radius: 6),
+          ]),
+          const SizedBox(height: 14),
+          const ShimmerTile(),
+          const ShimmerTile(),
+          const ShimmerTile(),
+        ]),
+      ),
     ]),
   );
 }

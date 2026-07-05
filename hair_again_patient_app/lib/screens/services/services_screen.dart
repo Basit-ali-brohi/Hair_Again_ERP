@@ -12,6 +12,15 @@ class ServicesScreen extends StatefulWidget {
 class _ServicesScreenState extends State<ServicesScreen> {
   String _selected = 'All';
   String _search = '';
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
 
   static const _categories = ['All', 'Transplant', 'PRP', 'Scalp', 'Laser', 'Consultation'];
 
@@ -86,14 +95,21 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
         // List
         Expanded(
-          child: list.isEmpty
-              ? const EmptyState(icon: Icons.search_off, title: 'No Services Found', subtitle: 'Try a different search or category.')
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, i) => _ServiceCard(svc: list[i]),
-                ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 450),
+            child: _loading
+              ? ListView(key: const ValueKey('shimmer'), padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                  children: List.generate(5, (_) => const ShimmerTile()))
+              : list.isEmpty
+                ? const EmptyState(icon: Icons.search_off, title: 'No Services Found', subtitle: 'Try a different search or category.')
+                : ListView.separated(
+                    key: const ValueKey('list'),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) => _ServiceCard(svc: list[i]),
+                  ),
+          ),
         ),
       ]),
     );
