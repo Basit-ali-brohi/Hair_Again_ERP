@@ -189,7 +189,7 @@ class AppState extends ChangeNotifier {
   late final List<Treatment>  treatments = _seedTreatments();
   late final List<Patient>    patients   = _loadOrSeed('patients', _seedPatients, Patient.fromJson);
   late final List<InventoryItem> inventory = _seedInventory();
-  late final List<Appointment>   appointments = _loadOrSeed('appointments', _seedAppointments, Appointment.fromJson);
+  late final List<Appointment>   appointments = _loadFreshAppointments();
   late final List<Invoice>       invoices     = _loadOrSeed('invoices', () => [], Invoice.fromJson);
 
   // ── Save helpers ──────────────────────────────────────────────────────────────
@@ -475,6 +475,39 @@ class AppState extends ChangeNotifier {
         InventoryItem(id: 'SKU-106', name: 'Mesotherapy Ampoules', category: 'Consumables', stock: 9, reorderLevel: 12, price: 2200),
         InventoryItem(id: 'SKU-107', name: 'Post-Op Care Packs', category: 'Retail', stock: 24, reorderLevel: 10, price: 3500),
       ];
+
+  // Load stored appointments but reseed today's if cache is stale (all today's slots in the past)
+  List<Appointment> _loadFreshAppointments() {
+    final stored = StorageService.loadList('appointments');
+    if (stored.isNotEmpty) {
+      final parsed = stored.map(Appointment.fromJson).toList();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final hasToday = parsed.any((a) {
+        final d = DateTime(a.when.year, a.when.month, a.when.day);
+        return d == today && a.status != ApptStatus.cancelled;
+      });
+      if (hasToday) return parsed;
+      // Stale — keep future/past records, inject fresh today's seed
+      final notToday = parsed.where((a) {
+        final d = DateTime(a.when.year, a.when.month, a.when.day);
+        return d != today;
+      }).toList();
+      return [..._todaySeed(), ...notToday];
+    }
+    return _seedAppointments();
+  }
+
+  List<Appointment> _todaySeed() {
+    final now = DateTime.now();
+    DateTime at(int h, int m) => DateTime(now.year, now.month, now.day, h, m);
+    return [
+      Appointment(id: 'AP-001', patientName: 'Bilal Ahmed',  treatment: 'PRP Therapy — Single Session',       surgeon: 'Dr. Rehman',    when: at(10, 30), status: ApptStatus.confirmed),
+      Appointment(id: 'AP-002', patientName: 'Ayesha Khan',  treatment: 'PRP Therapy — Single Session',       surgeon: 'Dr. Sara Iqbal', when: at(12,  0), status: ApptStatus.confirmed),
+      Appointment(id: 'AP-003', patientName: 'Sana Tariq',   treatment: 'Dermatology Consultation',           surgeon: 'Dr. Rehman',    when: at(15, 30), status: ApptStatus.pending),
+      Appointment(id: 'AP-004', patientName: 'Fatima Noor',  treatment: 'Low-Level Laser Therapy',            surgeon: 'Dr. Bilal Khan', when: at(17,  0), status: ApptStatus.pending),
+    ];
+  }
 
   List<Appointment> _seedAppointments() {
     final now = DateTime.now();

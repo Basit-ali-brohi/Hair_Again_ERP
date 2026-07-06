@@ -582,37 +582,30 @@ class _NavPanelState extends State<_NavPanel> {
   Widget _buildBottom(AppPalette p) {
     return Column(
       children: [
-        // Promo card (matches reference's "Upgrade to Unlock Premium Feature")
+        // Clinic status card
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF3D2B00), Color(0xFF6B4500)],
-              ),
-              borderRadius: BorderRadius.circular(6),
+              color: p.surfaceAlt,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: p.border),
             ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.auto_awesome, color: Colors.amber, size: 16),
-                ),
-              ]),
-              const SizedBox(height: 10),
-              const Text('Upgrade to Unlock', style: TextStyle(fontSize: 13.5, color: Colors.white, fontWeight: FontWeight.w700, height: 1.3)),
-              const Text('Premium Features', style: TextStyle(fontSize: 13.5, color: Colors.white, fontWeight: FontWeight.w700, height: 1.3)),
-              const SizedBox(height: 4),
-              const Text('Multi-branch, advanced analytics & AI insights', style: TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.4)),
-              const SizedBox(height: 12),
+            child: Row(children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                child: const Text('Upgrade', style: TextStyle(fontSize: 12.5, color: Color(0xFF3D2B00), fontWeight: FontWeight.w800)),
+                width: 32, height: 32,
+                decoration: BoxDecoration(color: p.gold.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                child: Icon(Icons.local_hospital_outlined, size: 16, color: p.gold),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Hair Again Clinic', style: p.body(12, weight: FontWeight.w700)),
+                Text('Karachi • Main Branch', style: p.body(10, color: p.textMuted)),
+              ])),
+              Container(
+                width: 8, height: 8,
+                decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle),
               ),
             ]),
           ),
