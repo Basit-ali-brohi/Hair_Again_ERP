@@ -993,19 +993,40 @@ class _TopBarState extends State<_TopBar> {
                 separatorBuilder: (_, i) => const SizedBox(height: 4),
                 itemBuilder: (_, i) {
                   final n = appState.notifications[i];
-                  return Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: n.read ? Colors.transparent : p.gold.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(8)),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8)), child: Icon(n.icon, size: 16, color: p.gold)),
-                      const SizedBox(width: 11),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(n.title, style: p.body(12.5, weight: FontWeight.w600)),
-                        const SizedBox(height: 2),
-                        Text(n.subtitle, style: p.body(11.5, color: p.textMuted)),
-                      ])),
-                      if (!n.read) Container(width: 7, height: 7, margin: const EdgeInsets.only(top: 4), decoration: BoxDecoration(color: p.gold, shape: BoxShape.circle)),
-                    ]),
+                  final canNav = n.targetIndex >= 0;
+                  return MouseRegion(
+                    cursor: canNav ? SystemMouseCursors.click : MouseCursor.defer,
+                    child: GestureDetector(
+                      onTap: () {
+                        n.read = true;
+                        appState.touch();
+                        _notifPortal.hide();
+                        if (canNav) appState.go(n.targetIndex);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: n.read ? Colors.transparent : p.gold.withValues(alpha: 0.07),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: canNav ? p.border.withValues(alpha: 0) : Colors.transparent),
+                        ),
+                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(8)), child: Icon(n.icon, size: 16, color: p.gold)),
+                          const SizedBox(width: 11),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(n.title, style: p.body(12.5, weight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text(n.subtitle, style: p.body(11.5, color: p.textMuted)),
+                            if (canNav) ...[
+                              const SizedBox(height: 4),
+                              Text('Tap to view →', style: p.body(10.5, color: p.gold, weight: FontWeight.w600)),
+                            ],
+                          ])),
+                          if (!n.read) Container(width: 7, height: 7, margin: const EdgeInsets.only(top: 4), decoration: BoxDecoration(color: p.gold, shape: BoxShape.circle)),
+                        ]),
+                      ),
+                    ),
                   );
                 },
               ),

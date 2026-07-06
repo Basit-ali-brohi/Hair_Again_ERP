@@ -29,8 +29,9 @@ class AppNotification {
   final String title;
   final String subtitle;
   final IconData icon;
+  final int targetIndex; // module index to navigate to; -1 = no nav
   bool read;
-  AppNotification({required this.title, required this.subtitle, required this.icon, this.read = false});
+  AppNotification({required this.title, required this.subtitle, required this.icon, this.targetIndex = -1, this.read = false});
 }
 
 class AppState extends ChangeNotifier {
@@ -171,17 +172,17 @@ class AppState extends ChangeNotifier {
 
   // ── Notifications ─────────────────────────────────────────────────────────────
   final List<AppNotification> notifications = [
-    AppNotification(title: 'Low stock alert', subtitle: 'PRP Kits below reorder level', icon: Icons.inventory_2_outlined),
-    AppNotification(title: 'Follow-up due', subtitle: 'Bilal Ahmed — Day-7 post-op review', icon: Icons.event_available_outlined),
-    AppNotification(title: 'New lead captured', subtitle: 'Instagram campaign — Sana Tariq', icon: Icons.person_add_alt_1_outlined),
-    AppNotification(title: 'Leave request pending', subtitle: 'Hira Saleem — Sick Leave (2 days)', icon: Icons.event_note_outlined),
-    AppNotification(title: 'Payroll due', subtitle: 'June 2026 payroll not yet processed', icon: Icons.payments_outlined),
+    AppNotification(title: 'Low stock alert',        subtitle: 'PRP Kits below reorder level',          icon: Icons.inventory_2_outlined,        targetIndex: 22),
+    AppNotification(title: 'Follow-up due',           subtitle: 'Bilal Ahmed — Day-7 post-op review',    icon: Icons.event_available_outlined,     targetIndex:  3),
+    AppNotification(title: 'New lead captured',       subtitle: 'Instagram campaign — Sana Tariq',       icon: Icons.person_add_alt_1_outlined,    targetIndex:  9),
+    AppNotification(title: 'Leave request pending',   subtitle: 'Hira Saleem — Sick Leave (2 days)',     icon: Icons.event_note_outlined,          targetIndex:  8),
+    AppNotification(title: 'Payroll due',             subtitle: 'June 2026 payroll not yet processed',   icon: Icons.payments_outlined,            targetIndex: 11),
   ];
 
   int get unreadCount => notifications.where((n) => !n.read).length;
   void markAllRead() { for (final n in notifications) n.read = true; notifyListeners(); }
-  void _notify(String t, String s, IconData i) =>
-      notifications.insert(0, AppNotification(title: t, subtitle: s, icon: i));
+  void _notify(String t, String s, IconData i, {int targetIndex = -1}) =>
+      notifications.insert(0, AppNotification(title: t, subtitle: s, icon: i, targetIndex: targetIndex));
   void touch() => notifyListeners();
 
   // ── Existing module data ──────────────────────────────────────────────────────
@@ -208,20 +209,20 @@ class AppState extends ChangeNotifier {
   }
 
   // CRM CRUD
-  void addPatient(Patient p) { patients.insert(0, p); _savePatients(); _notify('Patient registered', '${p.name} • ${p.status.label}', Icons.person_add_alt_1_outlined); notifyListeners(); }
+  void addPatient(Patient p) { patients.insert(0, p); _savePatients(); _notify('Patient registered', '${p.name} • ${p.status.label}', Icons.person_add_alt_1_outlined, targetIndex: 1); notifyListeners(); }
   void deletePatient(Patient p) { patients.remove(p); _savePatients(); notifyListeners(); }
 
   // Appointment CRUD
-  void addAppointment(Appointment a) { appointments.add(a); _saveAppointments(); _notify('Appointment booked', '${a.patientName} • ${a.treatment}', Icons.calendar_month_outlined); notifyListeners(); }
+  void addAppointment(Appointment a) { appointments.add(a); _saveAppointments(); _notify('Appointment booked', '${a.patientName} • ${a.treatment}', Icons.calendar_month_outlined, targetIndex: 3); notifyListeners(); }
   void setApptStatus(Appointment a, ApptStatus s) { a.status = s; _saveAppointments(); notifyListeners(); }
   void deleteAppointment(Appointment a) { appointments.remove(a); _saveAppointments(); notifyListeners(); }
 
   // Staff CRUD
-  void addStaff(Staff s) { staff.insert(0, s); _saveStaff(); _notify('Staff added', '${s.name} • ${s.role.label}', Icons.badge_outlined); notifyListeners(); }
+  void addStaff(Staff s) { staff.insert(0, s); _saveStaff(); _notify('Staff added', '${s.name} • ${s.role.label}', Icons.badge_outlined, targetIndex: 7); notifyListeners(); }
   void deleteStaff(Staff s) { staff.remove(s); _saveStaff(); notifyListeners(); }
 
   // POS / Invoice
-  void addInvoice(Invoice inv) { invoices.insert(0, inv); _saveInvoices(); _notify('Invoice generated', '${inv.id} • ${money(inv.subtotal)}', Icons.receipt_long_outlined); notifyListeners(); }
+  void addInvoice(Invoice inv) { invoices.insert(0, inv); _saveInvoices(); _notify('Invoice generated', '${inv.id} • ${money(inv.subtotal)}', Icons.receipt_long_outlined, targetIndex: 6); notifyListeners(); }
   void deleteInvoice(Invoice inv) { invoices.remove(inv); _saveInvoices(); notifyListeners(); }
 
   // Inventory CRUD
@@ -252,7 +253,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addLeaveRequest(LeaveRequest r) { leaveRequests.insert(0, r); _notify('Leave request', '${r.employeeName} — ${r.type.label} (${r.days} days)', Icons.event_note_outlined); notifyListeners(); }
+  void addLeaveRequest(LeaveRequest r) { leaveRequests.insert(0, r); _notify('Leave request', '${r.employeeName} — ${r.type.label} (${r.days} days)', Icons.event_note_outlined, targetIndex: 8); notifyListeners(); }
   void approveLeave(LeaveRequest r, String by) { r.status = LeaveStatus.approved; r.approvedBy = by; notifyListeners(); }
   void rejectLeave(LeaveRequest r, String reason) { r.status = LeaveStatus.rejected; r.rejectionReason = reason; notifyListeners(); }
 
@@ -287,7 +288,7 @@ class AppState extends ChangeNotifier {
   void addLead(Lead l) {
     leads.insert(0, l);
     _saveLeads();
-    _notify('New lead', '${l.name} — ${l.source.label}', Icons.person_add_alt_1_outlined);
+    _notify('New lead', '${l.name} — ${l.source.label}', Icons.person_add_alt_1_outlined, targetIndex: 9);
     notifyListeners();
   }
 
