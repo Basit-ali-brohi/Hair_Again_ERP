@@ -43,7 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
     return Scaffold(
+      backgroundColor: p.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
@@ -53,12 +55,12 @@ class _LoginScreenState extends State<LoginScreen> {
             Row(children: [
               Container(width: 44, height: 44, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFD4AF5B), Color(0xFF9A7A35)]), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.spa_outlined, color: Colors.black87, size: 22)),
               const SizedBox(width: 12),
-              Text('HAIR AGAIN', style: kDisplay(22, color: kGold, spacing: 1.5)),
+              Text('HAIR AGAIN', style: p.display(22, color: kGold, spacing: 1.5)),
             ]),
             const SizedBox(height: 40),
-            Text('Welcome Back', style: kDisplay(32)),
+            Text('Welcome Back', style: p.display(32)),
             const SizedBox(height: 6),
-            Text('Sign in to your account', style: kBody(15, color: kTextMuted)),
+            Text('Sign in to your account', style: p.body(15, color: p.textMuted)),
             const SizedBox(height: 32),
 
             // Error
@@ -70,34 +72,34 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Row(children: [
                   const Icon(Icons.error_outline, color: kDanger, size: 18),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(_error!, style: kBody(13, color: kDanger))),
+                  Expanded(child: Text(_error!, style: p.body(13, color: kDanger))),
                 ]),
               ),
             ],
 
             // Email
-            Text('Email / Phone', style: kLabel(12)),
+            Text('Email / Phone', style: p.label(12)),
             const SizedBox(height: 8),
             TextField(
               controller: _emailCtrl,
               keyboardType: TextInputType.emailAddress,
-              style: kBody(15),
-              decoration: InputDecoration(prefixIcon: const Icon(Icons.email_outlined, size: 20, color: kTextMuted), hintText: 'you@example.com'),
+              style: p.body(15),
+              decoration: InputDecoration(prefixIcon: Icon(Icons.email_outlined, size: 20, color: p.textMuted), hintText: 'you@example.com'),
             ),
             const SizedBox(height: 18),
 
             // Password
-            Text('Password', style: kLabel(12)),
+            Text('Password', style: p.label(12)),
             const SizedBox(height: 8),
             TextField(
               controller: _passCtrl,
               obscureText: _obscure,
-              style: kBody(15),
+              style: p.body(15),
               onSubmitted: (_) => _login(),
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.lock_outline, size: 20, color: kTextMuted),
+                prefixIcon: Icon(Icons.lock_outline, size: 20, color: p.textMuted),
                 hintText: '••••••••',
-                suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: kTextMuted), onPressed: () => setState(() => _obscure = !_obscure)),
+                suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: p.textMuted), onPressed: () => setState(() => _obscure = !_obscure)),
               ),
             ),
             const SizedBox(height: 12),
@@ -105,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // Forgot password
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton(onPressed: () => context.push('/forgot-password'), child: Text('Forgot Password?', style: kBody(13, color: kGold, weight: FontWeight.w600))),
+              child: TextButton(onPressed: () => context.push('/forgot-password'), child: Text('Forgot Password?', style: p.body(13, color: kGold, weight: FontWeight.w600))),
             ),
             const SizedBox(height: 8),
 
@@ -120,8 +122,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
             // Register
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text("Don't have an account? ", style: kBody(14, color: kTextMuted)),
-              GestureDetector(onTap: () => context.go('/register'), child: Text('Register', style: kBody(14, color: kGold, weight: FontWeight.w700))),
+              Text("Don't have an account? ", style: p.body(14, color: p.textMuted)),
+              GestureDetector(onTap: () => context.go('/register'), child: Text('Register', style: p.body(14, color: kGold, weight: FontWeight.w700))),
             ]),
           ]),
         ),

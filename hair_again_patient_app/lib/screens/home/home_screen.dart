@@ -445,10 +445,15 @@ class _PromoCarouselState extends State<_PromoCarousel> {
     final p = widget.p;
     return Column(children: [
       SizedBox(
-        height: 160,
+        height: 168,
         child: PageView.builder(
           controller: _ctrl,
-          onPageChanged: (i) => setState(() => _page = i),
+          physics: const PageScrollPhysics(),
+          onPageChanged: (i) {
+            _timer?.cancel();
+            setState(() => _page = i);
+            _startTimer();
+          },
           itemCount: _slides.length,
           itemBuilder: (ctx, i) {
             final s = _slides[i];
@@ -456,38 +461,38 @@ class _PromoCarouselState extends State<_PromoCarousel> {
               onTap: () => ctx.push(s.route),
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 2),
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: s.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: kGold.withValues(alpha: 0.22)),
                   boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.10), blurRadius: 20, offset: const Offset(0, 6))],
                 ),
-                child: Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(5)),
                       child: Text(s.badge, style: const TextStyle(fontSize: 9, color: Colors.black87, fontWeight: FontWeight.w800, letterSpacing: 0.9)),
                     ),
+                    const SizedBox(height: 8),
+                    Text(s.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 5),
+                    Text(s.sub, style: p.body(11, color: Colors.white60), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 10),
-                    Text(s.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1.25)),
-                    const SizedBox(height: 6),
-                    Text(s.sub, style: p.body(11, color: Colors.white60)),
-                    const SizedBox(height: 14),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(gradient: kGoldGradient, borderRadius: BorderRadius.circular(10),
                         boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))]),
-                      child: Text(s.cta, style: const TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.w700)),
+                      child: Text(s.cta, style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w700)),
                     ),
                   ])),
                   const SizedBox(width: 12),
-                  Container(width: 70, height: 70,
+                  Container(width: 64, height: 64,
                     decoration: BoxDecoration(color: kGold.withValues(alpha: 0.10), shape: BoxShape.circle,
                       border: Border.all(color: kGold.withValues(alpha: 0.22)),
                       boxShadow: [BoxShadow(color: kGold.withValues(alpha: 0.12), blurRadius: 14)]),
-                    child: Icon(s.icon, color: kGold, size: 32)),
+                    child: Icon(s.icon, color: kGold, size: 28)),
                 ]),
               ),
             );

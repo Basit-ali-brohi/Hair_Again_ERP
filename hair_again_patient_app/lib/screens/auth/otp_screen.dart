@@ -56,7 +56,9 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
     return Scaffold(
+      backgroundColor: p.bg,
       appBar: KAppBar(title: 'OTP Verification'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
@@ -67,11 +69,11 @@ class _OtpScreenState extends State<OtpScreen> {
             child: const Icon(Icons.verified_outlined, size: 38, color: kGold),
           ),
           const SizedBox(height: 24),
-          Text('Verify Your Identity', style: kDisplay(26), textAlign: TextAlign.center),
+          Text('Verify Your Identity', style: p.display(26), textAlign: TextAlign.center),
           const SizedBox(height: 10),
-          Text('We sent a 6-digit code to', style: kBody(14, color: kTextMuted), textAlign: TextAlign.center),
+          Text('We sent a 6-digit code to', style: p.body(14, color: p.textMuted), textAlign: TextAlign.center),
           const SizedBox(height: 4),
-          Text(widget.email, style: kBody(14, color: kGold, weight: FontWeight.w600), textAlign: TextAlign.center),
+          Text(widget.email, style: p.body(14, color: kGold, weight: FontWeight.w600), textAlign: TextAlign.center),
           const SizedBox(height: 36),
 
           if (_error != null) ...[
@@ -79,7 +81,7 @@ class _OtpScreenState extends State<OtpScreen> {
               margin: const EdgeInsets.only(bottom: 20),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: kDanger.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-              child: Text(_error!, style: kBody(13, color: kDanger), textAlign: TextAlign.center),
+              child: Text(_error!, style: p.body(13, color: kDanger), textAlign: TextAlign.center),
             ),
           ],
 
@@ -87,12 +89,12 @@ class _OtpScreenState extends State<OtpScreen> {
           Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(6, (i) => Container(
             width: 48, height: 58,
             margin: const EdgeInsets.symmetric(horizontal: 5),
-            decoration: BoxDecoration(color: kSurfaceAlt, borderRadius: BorderRadius.circular(12), border: Border.all(color: kBorder)),
+            decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
             child: TextField(
               controller: _digits[i], focusNode: _foci[i],
               textAlign: TextAlign.center, maxLength: 1,
               keyboardType: TextInputType.number,
-              style: kDisplay(22),
+              style: p.display(22),
               cursorColor: kGold,
               decoration: const InputDecoration(
                 border: InputBorder.none, counterText: '',
@@ -111,10 +113,10 @@ class _OtpScreenState extends State<OtpScreen> {
           const SizedBox(height: 24),
 
           _resendSeconds > 0
-              ? Text('Resend code in $_resendSeconds s', style: kBody(13, color: kTextMuted))
+              ? Text('Resend code in $_resendSeconds s', style: p.body(13, color: p.textMuted))
               : TextButton(
                   onPressed: () { setState(() => _resendSeconds = 30); _startResendTimer(); },
-                  child: Text('Resend OTP', style: kBody(14, color: kGold, weight: FontWeight.w600)),
+                  child: Text('Resend OTP', style: p.body(14, color: kGold, weight: FontWeight.w600)),
                 ),
         ]),
       ),

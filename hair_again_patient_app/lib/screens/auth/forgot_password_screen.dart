@@ -62,51 +62,54 @@ class _InputState extends StatelessWidget {
   const _InputState({required this.emailCtrl, required this.loading, this.error, required this.onSend, required this.onBack});
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Center(child: Container(
-      width: 88, height: 88,
-      decoration: BoxDecoration(
-        gradient: RadialGradient(colors: [kGold.withValues(alpha: 0.18), kGold.withValues(alpha: 0.04)]),
-        shape: BoxShape.circle,
-        border: Border.all(color: kGold.withValues(alpha: 0.25), width: 1.5),
-      ),
-      child: const Icon(Icons.lock_reset_rounded, size: 40, color: kGold),
-    )),
-    const SizedBox(height: 28),
-    Text('Reset Your Password', style: kDisplay(28), textAlign: TextAlign.center),
-    const SizedBox(height: 8),
-    Text('Enter the email linked to your account. We\'ll send you a 6-digit code to verify your identity.', style: kBody(14, color: kTextMuted), textAlign: TextAlign.center),
-    const SizedBox(height: 36),
+  Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Center(child: Container(
+        width: 88, height: 88,
+        decoration: BoxDecoration(
+          gradient: RadialGradient(colors: [kGold.withValues(alpha: 0.18), kGold.withValues(alpha: 0.04)]),
+          shape: BoxShape.circle,
+          border: Border.all(color: kGold.withValues(alpha: 0.25), width: 1.5),
+        ),
+        child: const Icon(Icons.lock_reset_rounded, size: 40, color: kGold),
+      )),
+      const SizedBox(height: 28),
+      Text('Reset Your Password', style: p.display(28), textAlign: TextAlign.center),
+      const SizedBox(height: 8),
+      Text('Enter the email linked to your account. We\'ll send you a 6-digit code to verify your identity.', style: p.body(14, color: p.textMuted), textAlign: TextAlign.center),
+      const SizedBox(height: 36),
 
-    if (error != null) ...[
-      Container(
-        padding: const EdgeInsets.all(14),
-        margin: const EdgeInsets.only(bottom: 20),
-        decoration: BoxDecoration(color: kDanger.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: kDanger.withValues(alpha: 0.3))),
-        child: Row(children: [
-          const Icon(Icons.error_outline, color: kDanger, size: 18),
-          const SizedBox(width: 10),
-          Expanded(child: Text(error!, style: kBody(13, color: kDanger))),
-        ]),
-      ),
-    ],
+      if (error != null) ...[
+        Container(
+          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.only(bottom: 20),
+          decoration: BoxDecoration(color: kDanger.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: kDanger.withValues(alpha: 0.3))),
+          child: Row(children: [
+            const Icon(Icons.error_outline, color: kDanger, size: 18),
+            const SizedBox(width: 10),
+            Expanded(child: Text(error!, style: p.body(13, color: kDanger))),
+          ]),
+        ),
+      ],
 
-    Text('Email Address', style: kLabel(12)),
-    const SizedBox(height: 8),
-    TextField(
-      controller: emailCtrl,
-      keyboardType: TextInputType.emailAddress,
-      style: kBody(15),
-      decoration: const InputDecoration(
-        prefixIcon: Icon(Icons.email_outlined, size: 20, color: kTextMuted),
-        hintText: 'you@example.com',
+      Text('Email Address', style: p.label(12)),
+      const SizedBox(height: 8),
+      TextField(
+        controller: emailCtrl,
+        keyboardType: TextInputType.emailAddress,
+        style: p.body(15),
+        decoration: InputDecoration(
+          prefixIcon: Icon(Icons.email_outlined, size: 20, color: p.textMuted),
+          hintText: 'you@example.com',
+        ),
       ),
-    ),
-    const SizedBox(height: 32),
-    GoldButton(label: 'SEND CODE', onTap: onSend, loading: loading, icon: Icons.send_rounded),
-    const SizedBox(height: 16),
-    OutlineBtn(label: 'Back to Login', onTap: onBack),
-  ]);
+      const SizedBox(height: 32),
+      GoldButton(label: 'SEND CODE', onTap: onSend, loading: loading, icon: Icons.send_rounded),
+      const SizedBox(height: 16),
+      OutlineBtn(label: 'Back to Login', onTap: onBack),
+    ]);
+  }
 }
 
 class _SentState extends StatelessWidget {
@@ -115,26 +118,29 @@ class _SentState extends StatelessWidget {
   const _SentState({required this.email, required this.onContinue});
 
   @override
-  Widget build(BuildContext context) => Column(children: [
-    const SizedBox(height: 24),
-    Container(
-      width: 88, height: 88,
-      decoration: BoxDecoration(
-        color: kSuccess.withValues(alpha: 0.12),
-        shape: BoxShape.circle,
-        border: Border.all(color: kSuccess.withValues(alpha: 0.3), width: 1.5),
+  Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
+    return Column(children: [
+      const SizedBox(height: 24),
+      Container(
+        width: 88, height: 88,
+        decoration: BoxDecoration(
+          color: kSuccess.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+          border: Border.all(color: kSuccess.withValues(alpha: 0.3), width: 1.5),
+        ),
+        child: const Icon(Icons.mark_email_read_outlined, size: 40, color: kSuccess),
       ),
-      child: const Icon(Icons.mark_email_read_outlined, size: 40, color: kSuccess),
-    ),
-    const SizedBox(height: 24),
-    Text('Code Sent!', style: kDisplay(26), textAlign: TextAlign.center),
-    const SizedBox(height: 12),
-    Text('We\'ve sent a 6-digit OTP to', style: kBody(14, color: kTextMuted), textAlign: TextAlign.center),
-    const SizedBox(height: 4),
-    Text(email, style: kBody(14, color: kGold, weight: FontWeight.w700), textAlign: TextAlign.center),
-    const SizedBox(height: 8),
-    Text('Check your inbox and enter the code on the next screen.', style: kBody(13, color: kTextMuted), textAlign: TextAlign.center),
-    const SizedBox(height: 40),
-    GoldButton(label: 'ENTER OTP', onTap: onContinue, icon: Icons.arrow_forward_rounded),
-  ]);
+      const SizedBox(height: 24),
+      Text('Code Sent!', style: p.display(26), textAlign: TextAlign.center),
+      const SizedBox(height: 12),
+      Text('We\'ve sent a 6-digit OTP to', style: p.body(14, color: p.textMuted), textAlign: TextAlign.center),
+      const SizedBox(height: 4),
+      Text(email, style: p.body(14, color: kGold, weight: FontWeight.w700), textAlign: TextAlign.center),
+      const SizedBox(height: 8),
+      Text('Check your inbox and enter the code on the next screen.', style: p.body(13, color: p.textMuted), textAlign: TextAlign.center),
+      const SizedBox(height: 40),
+      GoldButton(label: 'ENTER OTP', onTap: onContinue, icon: Icons.arrow_forward_rounded),
+    ]);
+  }
 }

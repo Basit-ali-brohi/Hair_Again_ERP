@@ -151,11 +151,11 @@ class _SessionTile extends StatelessWidget {
         Row(children: [
           Icon(Icons.location_on_outlined, size: 11, color: p.textMuted),
           const SizedBox(width: 3),
-          Text(session.location, style: p.body(11, color: p.textMuted)),
-          const SizedBox(width: 10),
+          Flexible(child: Text(session.location, style: p.body(11, color: p.textMuted), overflow: TextOverflow.ellipsis)),
+          const SizedBox(width: 8),
           Icon(Icons.access_time_rounded, size: 11, color: p.textMuted),
           const SizedBox(width: 3),
-          Text(session.lastActive, style: p.body(11, color: p.textMuted)),
+          Flexible(child: Text(session.lastActive, style: p.body(11, color: p.textMuted), overflow: TextOverflow.ellipsis)),
         ]),
       ])),
       if (onRevoke != null) ...[

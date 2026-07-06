@@ -46,14 +46,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = HaTheme.of(context);
     return Scaffold(
-      appBar: KAppBar(title: 'Create Account', actions: [TextButton(onPressed: () => context.go('/login'), child: Text('Sign In', style: kBody(14, color: kGold, weight: FontWeight.w600)))]),
+      backgroundColor: p.bg,
+      appBar: KAppBar(title: 'Create Account', actions: [TextButton(onPressed: () => context.go('/login'), child: Text('Sign In', style: p.body(14, color: kGold, weight: FontWeight.w600)))]),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Join Hair Again', style: kDisplay(28)),
+          Text('Join Hair Again', style: p.display(28)),
           const SizedBox(height: 6),
-          Text('Create your patient account', style: kBody(14, color: kTextMuted)),
+          Text('Create your patient account', style: p.body(14, color: p.textMuted)),
           const SizedBox(height: 28),
 
           if (_error != null) ...[
@@ -63,37 +65,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
               decoration: BoxDecoration(color: kDanger.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: kDanger.withValues(alpha: 0.3))),
               child: Row(children: [
                 const Icon(Icons.error_outline, color: kDanger, size: 18), const SizedBox(width: 10),
-                Expanded(child: Text(_error!, style: kBody(13, color: kDanger))),
+                Expanded(child: Text(_error!, style: p.body(13, color: kDanger))),
               ]),
             ),
           ],
 
-          Text('Full Name', style: kLabel(12)),
+          Text('Full Name', style: p.label(12)),
           const SizedBox(height: 8),
-          TextField(controller: _nameCtrl, textCapitalization: TextCapitalization.words, style: kBody(15),
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.person_outline, size: 20, color: kTextMuted), hintText: 'Ahmad Ali')),
+          TextField(controller: _nameCtrl, textCapitalization: TextCapitalization.words, style: p.body(15),
+            decoration: InputDecoration(prefixIcon: Icon(Icons.person_outline, size: 20, color: p.textMuted), hintText: 'Ahmad Ali')),
           const SizedBox(height: 18),
 
-          Text('Email Address', style: kLabel(12)),
+          Text('Email Address', style: p.label(12)),
           const SizedBox(height: 8),
-          TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, style: kBody(15),
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.email_outlined, size: 20, color: kTextMuted), hintText: 'ahmad@gmail.com')),
+          TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, style: p.body(15),
+            decoration: InputDecoration(prefixIcon: Icon(Icons.email_outlined, size: 20, color: p.textMuted), hintText: 'ahmad@gmail.com')),
           const SizedBox(height: 18),
 
-          Text('Phone Number', style: kLabel(12)),
+          Text('Phone Number', style: p.label(12)),
           const SizedBox(height: 8),
-          TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, style: kBody(15),
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.phone_outlined, size: 20, color: kTextMuted), hintText: '+92 300 1234567')),
+          TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, style: p.body(15),
+            decoration: InputDecoration(prefixIcon: Icon(Icons.phone_outlined, size: 20, color: p.textMuted), hintText: '+92 300 1234567')),
           const SizedBox(height: 18),
 
-          Text('Password', style: kLabel(12)),
+          Text('Password', style: p.label(12)),
           const SizedBox(height: 8),
           TextField(
-            controller: _passCtrl, obscureText: _obscure, style: kBody(15),
+            controller: _passCtrl, obscureText: _obscure, style: p.body(15),
             decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.lock_outline, size: 20, color: kTextMuted),
+              prefixIcon: Icon(Icons.lock_outline, size: 20, color: p.textMuted),
               hintText: 'Min. 8 characters',
-              suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: kTextMuted), onPressed: () => setState(() => _obscure = !_obscure)),
+              suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: p.textMuted), onPressed: () => setState(() => _obscure = !_obscure)),
             ),
           ),
           const SizedBox(height: 20),
@@ -105,15 +107,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 width: 20, height: 20, margin: const EdgeInsets.only(top: 1),
-                decoration: BoxDecoration(color: _agreed ? kGold : Colors.transparent, borderRadius: BorderRadius.circular(5), border: Border.all(color: _agreed ? kGold : kBorder, width: 1.5)),
+                decoration: BoxDecoration(color: _agreed ? kGold : Colors.transparent, borderRadius: BorderRadius.circular(5), border: Border.all(color: _agreed ? kGold : p.border, width: 1.5)),
                 child: _agreed ? const Icon(Icons.check, size: 13, color: Colors.black87) : null,
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text.rich(TextSpan(style: kBody(13, color: kTextMuted), children: [
+              Expanded(child: Text.rich(TextSpan(style: p.body(13, color: p.textMuted), children: [
                 const TextSpan(text: 'I agree to the '),
-                TextSpan(text: 'Terms & Conditions', style: kBody(13, color: kGold, weight: FontWeight.w600)),
+                TextSpan(text: 'Terms & Conditions', style: p.body(13, color: kGold, weight: FontWeight.w600)),
                 const TextSpan(text: ' and '),
-                TextSpan(text: 'Privacy Policy', style: kBody(13, color: kGold, weight: FontWeight.w600)),
+                TextSpan(text: 'Privacy Policy', style: p.body(13, color: kGold, weight: FontWeight.w600)),
               ]))),
             ]),
           ),
@@ -129,8 +131,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 28),
 
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text('Already have an account? ', style: kBody(14, color: kTextMuted)),
-            GestureDetector(onTap: () => context.go('/login'), child: Text('Sign In', style: kBody(14, color: kGold, weight: FontWeight.w700))),
+            Text('Already have an account? ', style: p.body(14, color: p.textMuted)),
+            GestureDetector(onTap: () => context.go('/login'), child: Text('Sign In', style: p.body(14, color: kGold, weight: FontWeight.w700))),
           ]),
         ]),
       ),
